@@ -33,7 +33,7 @@ var curUser; // should be a user
 app.use(express.urlencoded({ extended: true })); // Add this line for form data
 
 // MongoDB connection setup
-const uri = "";
+const uri = "";//TODO: Fix secret
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
