@@ -752,6 +752,7 @@ app.post('/signup', async (req, res) => {
           description: "",
           dlsuID: "",
           dlsuRole: "",
+          role:"member",
           gender: ""
       });
 
