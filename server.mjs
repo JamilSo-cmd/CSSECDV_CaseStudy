@@ -2,16 +2,17 @@ import express from 'express';
 import path from 'path';
 import { MongoClient, ServerApiVersion } from 'mongodb';
 import { ObjectId } from 'mongodb';
-import { BSON, EJSON} from 'bson';
 import session from 'express-session';
-import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: './secrets.env' });
 
 // unique ID generation for sessions
 import {v4 as uuidv4} from 'uuid';
 
 const app = express();
-const port = 10000;
+const port = process.env.PORT;
 const __dirname = path.resolve();
 const saltRounds = 10;
 
@@ -33,7 +34,7 @@ var curUser; // should be a user
 app.use(express.urlencoded({ extended: true })); // Add this line for form data
 
 // MongoDB connection setup
-const uri = "";//TODO: Fix secret
+const uri = process.env.MONGODB_CONN;
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
