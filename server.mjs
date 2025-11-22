@@ -590,7 +590,7 @@ app.get('/userData', async (req, res) => {
       userID = req.session.userInfo._id;
     }
     catch(err){
-      console.log(err);
+      console.log("Cannot read user id");
     }
     if (userID === null || userID === "null"){
       console.log(true);
@@ -630,7 +630,7 @@ app.get('/userData', async (req, res) => {
         res.json(userData);
       }
     } catch (error) {
-      console.error("Error locating the user: " , error);
+      console.error("Error locating the user");
     }
 
   }  

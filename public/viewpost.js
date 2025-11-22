@@ -41,7 +41,8 @@ $(document).ready(function () {
 
                     const userData = await responseUser.json();
                     console.log(userData);  
-
+                    
+                    //TODO: fix admin
                     if (userData[0]._id === postData[0].authorID || userData[0]._id === "660c5d556224905450a1c10b" /*adminstrator's id*/){
                         $(".post").find(".editButton").show();
                     }
