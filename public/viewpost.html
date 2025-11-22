@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>Home Page</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script type ="text/javascript" src ="/viewpost.js" defer></script>
+    </head>
+
+    <body>
+        <table class="main">
+        <!--Header Box-->
+            <tr>
+                <td colspan="2"><div id="homeHeader"> 
+
+                    <table id="headerOptions">
+                        <!--icon (placeholder image present)-->
+                        <td><div style="width:200px;"><img src="https://icons.iconarchive.com/icons/iconarchive/dogecoin-to-the-moon/512/Doge-icon.png" style="width: 40px;height: 40px;"></div></td>
+                        <!--Search button-->
+                        <td><a style="text-decoration: none; color: black;" href="index.html"><div id="button" class="highlight"><p>SEARCH</p></div></td></a>
+                        <!--Search Text Field-->
+                        <td style="width:300px;"><h2 style="margin: 0px;margin-left: 200px;">DLSU FORUMS</h2></td>
+                        <!--Login button-->
+                        <td style="padding-left:200px;float: right;"><a class="loginbutton" href="login.html"><div id="button" class="highlight"><p>LOGIN</p></div></a></td>
+                    </table>
+
+                </div></td>
+            </tr>
+
+            <tr>
+            <!--Side Box-->    
+                <td class="sideBox">     
+                    
+                    <div class="sidePanel">
+                            
+                        <a href="index.html"><div id="sideButton"  class="highlight" style="top:80px;"><p>HOME</p></div></a>
+
+                        <a href="profile.html"><div id="sideButton" class="highlight" style="top:160px;"><p>PROFILE</p></div></a>
+
+                        <a href="editProfile.html"><div id="sideButton" class="highlight" style="top:240px;"><p>EDIT PROFILE</p></div></a>
+                         
+                        <a href="about.html"><div id="sideButton" class="highlight" style="top:320px;"><p>ABOUT US</p></div></a>
+                         
+                        <a href="create.html"><div id="sideButton" class="highlight" style="top:650px;"><p>+ CREATE POST</p></div></a>
+
+                    </div>
+            
+                </td>
+
+                <!--Content here (images are placeholders)-->
+                <td>
+                    <div class="postWindow">
+                        
+                        <div class="post">
+                            <!--Post Header-->
+                            <div class="postHeader"> 
+                                <img id='posterPic' class="icon" src="">
+                                <div style ="margin-top: auto;margin-bottom: auto;">
+                                    <a href="profile.html" id="posterUsername" style="text-decoration: none;font-size: 1rem;"><b></b></a>
+                                    <br>
+                                    <p id='posterDate' style="text-decoration: none;font-size: 0.8rem;margin:0px"></p>
+                                </div>
+
+                            </div>
+                            <!--Post Contents -->
+                            <div class="postBody">
+                                <h2 style="margin: 0;" id="viewPostTitle"></h2>
+                                <hr>
+                                <p id="viewPostBody"></p></div>
+                                <!-- <Like,dislike,share button bar> -->
+                                <div class="reactionbar"> 
+                                    <button type="button" id="likeButton" class="likeButton" onclick=""> Like </button> 
+                                    <p id="likeCount">0</p>
+
+                                    <button type="button" id="dislikeButton" class="dislikeButton" onclick=""> Dislike </button> 
+                                    <p id="dislikeCount">0</p>
+                                    
+                                    <a id="editLink" href=""><button type="button" class="editButton" hidden> Edit </button></a>
+                                
+                            </div>
+                        </div>
+
+                        <div class="commentsection" style="color: rgb(96, 96, 96);">
+                            <div class = "postHeader">
+                                <p id = "loginmessage" style ="width: 200px; "><a href = "login.html">Login</a> to comment!</p>
+                                <form action ="/postComment" method="post" style="display:flex;flex-direction: row;">
+                                    <textarea id="commentBox" name="comment" placeholder = "Type your comment here!"rows="4" cols="50" style="width: 600px;" required></textarea>
+                                    <input type="text" value="" id="postID" name="postID" hidden required>
+                                    <input type="text" value="" id="authorID" name="authorID" hidden  required>
+                                    <div style = "margin-left: 10px;"><input type="submit" id ="postComment" style="height: max-content; margin-top:50%;" value="Post"></button></div>
+                                </form>
+                            </div>
+                            <div id="commentTemplate">
+                                <div class="postHeader">
+                                    <div class="message">
+                                        <table>
+                                            <tr>
+                                                <td><img class="commentIcon" src="" /></td>
+                                                <td><div><a href="profile.html" class="username"></a></div></td>
+                                                <td><a class="commentDate"></a></td>
+                                            </tr>
+                                        </table>
+                                        <!-- <link to profile later> -->
+                                    
+                                        <div class="comment"></div>
+                                        <br>
+                                        <!-- <Like,dislike button bar> -->
+                                        <div class="reactionbar"> 
+                                            
+                                            <button type="button" class="likeButton"> Like </button> 
+                                            <p class='commentLikeCount' id="commentLikeCount">0</p>
+
+                                            <button type="button" class="dislikeButton"> Dislike </button> 
+                                            <p class='commentDislikeCount' id="commentDislikeCount">0</p>                                     
+                                        </div>
+                                        
+                                    </div>    
+                                </div> 
+                            </div>
+
+                            <!----div class="postHeader">
+                                <div class="message">
+
+                                    <table>
+                                        <tr>
+                                            <td><img src="http://www.gravatar.com/avatar/df125f7b89730a39163bb17c1c18c1d9?s=18&d=identicon&r=PG" class = "commenticon" /></td>
+                                            <td><div class="user"><a href>User2</a></div></td>
+                                        </tr>
+                                    </table>
+                                   
+                                    <div class="comment">xd</div>
+                                    <br>
+
+                                    <div class="reactionbar"> 
+
+                                        <button type="button" class="likeButton" onclick="incrementCommentLikes2()"> Like </button> 
+                                        <span id="commentLikeCount2">0</span>
+
+                                        <button type="button" class="dislikeButton" onclick="incrementCommentDislikes2()"> Dislike </button> 
+                                        <span id="commentDislikeCount2">0</span> 
+                                    
+                                    </div>
+                                </div>
+                            </div> -->
+
+                            <div  class="postFooter" style="color: rgb(96, 96, 96);">
+                                <p>No more comments</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </td>
+
+                
+
+            </tr>
+        </table>    
+        
+        <script>
+            // for when user clicks like or dislike
+            async function likeThis(likePostID, likeValue) {
+                if(likeValue == 1)
+                    console.log('sent a like');
+                else if(likeValue == -1)
+                    console.log('sent a dislike');
+                $.get('/like?postID=' + likePostID + '&likeValue=' + likeValue, function(data, status){
+                    
+                    console.log(data);
+                    
+                    document.getElementById('dislikeCount').textContent = data.dislikes;
+                    document.getElementById('likeCount').textContent = data.likes;
+
+                })
+            }
+        </script>
+
+    </body>
+
+</html>
+

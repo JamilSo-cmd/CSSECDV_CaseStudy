@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+
+        <title>Home Page</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script type ="text/javascript" src ="/userPosts.js" defer></script>
+    </head>
+
+    <body>
+
+        <table class="main">
+        <!--Header Box-->
+            <tr>
+                <td colspan="2"><div id="homeHeader"> 
+
+                    <table id="headerOptions">
+                        <!--icon (placeholder image present)-->
+                        <td><div style="width:200px;"><img src="https://icons.iconarchive.com/icons/iconarchive/dogecoin-to-the-moon/512/Doge-icon.png" style="width: 40px;height: 40px;"></div></td>
+                        <!--Search button-->
+                        <td><a style="text-decoration: none; color: black;" href="index.html"><div id="button" class="highlight"><p>SEARCH</p></div></td></a>
+                        <!--Search Text Field-->
+                        <td style="width:300px;"><h2 style="margin: 0px;margin-left: 200px;">DLSU FORUMS</h2></td>
+                        <!--Login button-->
+                        <td style="padding-left:200px;float: right;"><a class="loginbutton" href="login.html"><div id="button" class="highlight"><p>LOGIN</p></div></a></td>
+                    </table>
+
+                </div></td>
+            </tr>
+
+            <tr>
+            <!--Side Box-->    
+                <td class="sideBox">     
+                    
+                    <div class="sidePanel">
+                        
+                        <a href="index.html"><div id="sideButton"  class="highlight" style="top:80px;"><p>HOME</p></div></a>
+
+                        <a href="profile.html"><div id="sideButton" class="highlight" style="top:160px;"><p>PROFILE</p></div></a>
+
+                        <a href="editProfile.html"><div id="sideButton" class="highlight" style="top:240px;"><p>EDIT PROFILE</p></div></a>
+                         
+                        <a href="about.html"><div id="sideButton" class="highlight" style="top:320px;"><p>ABOUT US</p></div></a>
+                         
+                        <a href="create.html"><div id="sideButton" class="highlight" style="top:650px;"><p>+ CREATE POST</p></div></a>
+
+            
+                </td>
+
+                <!--Content here (images are placeholders)-->
+                <td>
+                    <div class="postWindow" style="padding-right:300px;">
+                        
+                        <!--template for posts-->
+                        <div class="post" id="postTemplate">
+                            <!--Post Header-->
+                            <div class="postHeader"> 
+                                <img class="icon">
+                                <div><a class='username'></a>
+                                    <br>
+                                    <a style="text-decoration: none;font-size: 0.8rem;" class="viewPostLink">View Post</a>
+                                    <br>
+                                    <b class='date' style="text-decoration: none;font-size: 0.8rem;"></b>
+                                </div>
+                            </div>
+                            <!--Post Contents -->
+                            <div class="postBody" style="min-height: 420px;">
+                                <h2 style="margin: 0;" class="subject"></h2>
+                                <hr>
+                                <p class="message"></P>
+                            </div>
+                            <div style="display: flex;flex-direction: row;padding-bottom: 10px;padding-left: 20px;"> 
+                                <b> Likes: </b> 
+                                <p id="likes" style="margin:0px;margin-right: 20px;">0</p>
+    
+                                <b> Dislikes: </b> 
+                                <p id="dislikes" style="margin:0px;">0</p>
+                                
+                                <a id="editLink" href=""><button type="button" class="editButton" hidden> Edit </button></a>
+                            
+                        </div>
+                            <div class="postFooter"><p class="pageNum"></p></div>
+                        </div>
+                    </div>
+                        
+                </td>
+
+            </tr>
+        </table>    
+    </body>
+
+</html>
