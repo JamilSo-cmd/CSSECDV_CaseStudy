@@ -22,3 +22,8 @@ node server.mjs
 ```
 This project uses node.js as a server, and is connected to MongoDb atlas.
 
+To install the packages needed, just use this line:
+```
+npm install
+```
+
