@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+
+        <title>Home Page</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script type ="text/javascript" src ="/userPosts.js" defer></script>
+    </head>
+
+    <body>
+
+        <table class="main">
+        <!--Header Box-->
+            <%- include("partials/header") %>
+
+            <tr>
+            <!--Side Box-->    
+                <%- include("partials/sidebar") %>
+
+                <!--Content here (images are placeholders)-->
+                <td>
+                    <div class="postWindow" style="padding-right:300px;">
+                        
+                        <!--template for posts-->
+                        <div class="post" id="postTemplate">
+                            <!--Post Header-->
+                            <div class="postHeader"> 
+                                <img class="icon">
+                                <div><a class='username'></a>
+                                    <br>
+                                    <a style="text-decoration: none;font-size: 0.8rem;" class="viewPostLink">View Post</a>
+                                    <br>
+                                    <b class='date' style="text-decoration: none;font-size: 0.8rem;"></b>
+                                </div>
+                            </div>
+                            <!--Post Contents -->
+                            <div class="postBody" style="min-height: 420px;">
+                                <h2 style="margin: 0;" class="subject"></h2>
+                                <hr>
+                                <p class="message"></P>
+                            </div>
+                            <div style="display: flex;flex-direction: row;padding-bottom: 10px;padding-left: 20px;"> 
+                                <b> Likes: </b> 
+                                <p id="likes" style="margin:0px;margin-right: 20px;">0</p>
+    
+                                <b> Dislikes: </b> 
+                                <p id="dislikes" style="margin:0px;">0</p>
+                                
+                                <a id="editLink" href=""><button type="button" class="editButton" hidden> Edit </button></a>
+                            
+                        </div>
+                            <div class="postFooter"><p class="pageNum"></p></div>
+                        </div>
+                    </div>
+                        
+                </td>
+
+            </tr>
+        </table>    
+    </body>
+
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+
+        <title>Home Page</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script type ="text/javascript" src ="/create.js" defer></script>
+    </head>
+
+    <body>
+
+        <table class="main">
+        <!--Header Box-->
+            <%- include("partials/header") %>
+
+            <tr>
+            <!--Side Box-->    
+                <%- include("partials/sidebar") %>
+
+                <!--Content here (images are placeholders)-->
+                <td>
+                    <div class="postWindow">
+                        
+                        <div class="post" style="width: 600px;">
+                            <!--Post Header-->
+                            <div class="postHeader"> 
+                                <div><b><h1 style="margin: 0px;padding-left: 5px;">Create</h1></b></div>
+                            </div>
+                            <!--Post Contents -->
+                            <div class="postBody">
+                                <form action="/create" method="post" id="createForm">
+                                <!-- <form id="createForm" onsubmit="createPost()"> -->
+                                    <h3 style="margin: 0;">Subject:</h3><input style="width:400px;" type="text" id="subject" name="subject" required>
+                                    <hr>
+                                    <h3 style="margin: 0;">Message:</h3><input style="height: 200px; width:400px;" type="text" id="message" name="message" required>
+                                    <hr>
+                                    <h3>Tag:</h3>
+                                    <input list ="tagList" name="tag" id="tags" required>
+                                    <datalist id="tagList">
+                                        <option value="General">General</option>
+                                        <option value="School">School</option>
+                                        <option value="Enterntainment">Enterntainment</option>
+                                        <option value="Technical">Technical</option>
+                                    </datalist>
+                                    <hr>
+                                    <br><input style="margin-top: 20px;" type="submit" id ="submitCreate">
+                                </form>
+                            </div>
+                            <div class="postFooter"><p></p></div>
+                        </div>
+                        
+                    </div>
+                </td>
+
+            </tr>
+        </table>    
+                
+    </body>
+
+</html>

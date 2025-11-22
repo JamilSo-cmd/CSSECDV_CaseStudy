@@ -62,12 +62,14 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
+app.set("view engine", "ejs");
+app.set("views", "views");
 
-app.use('/', express.static('public', {index: "index.html"}))
+app.use('/', express.static('public', {index: "index"}))
 
 app.get('/index', (req, res) =>{
 
-  res.sendFile('./public/index.html', { root: __dirname });
+  res.render("index")
 
 });
 
@@ -124,7 +126,7 @@ app.post('/postComment', async (req,res) =>{
     dislikes: 0,
     likes: 0,
   });
-  res.redirect("/viewpost.html?postID="+postID);
+  res.redirect("/viewpost?postID="+postID);
 
 });
 
@@ -473,7 +475,7 @@ app.get('/filter', async (req, res) => {
 })
 
 app.get('/login', (req, res) =>{
-  res.sendFile('./public/login.html', { root: __dirname });
+    res.render("login");
 
 });
 
@@ -534,7 +536,7 @@ app.post('/editProfile', async (req, res) => {
       }
 
       console.log("User profile updated successfully");
-      return res.redirect('/profile.html');
+      return res.redirect('/profile');
       
       
     }
@@ -564,7 +566,7 @@ app.post('/login', async (req, res) => {
     const match = await bcrypt.compare(password,user.password);
     
     if (!match) {
-      return res.redirect('/login.html?error=invalid_credentials');
+      return res.redirect('/login?error=invalid_credentials');
     }
     
 
@@ -572,7 +574,7 @@ app.post('/login', async (req, res) => {
     curUser = user; // assigns global variable to the user who just logged in
     req.session.userInfo = user; // sets session userInfo to be user who just logged in (WIP)
     console.log('User logged in: ' + req.session.userInfo.username); // to see if the username was gotten correctly
-    return res.redirect('/index.html'); // Change the redirect URL as needed
+    return res.redirect('/index'); // Change the redirect URL as needed
 
   } catch (error) {
     console.error("Error occurred during login:", error);
@@ -640,12 +642,12 @@ app.get('/userData', async (req, res) => {
 
 app.get('/profile', (req, res) =>{
 
-  res.sendFile('./public/profile.html', { root: __dirname });
+    res.render("profile");
 
 });
 
 app.get('/create',(req, res) =>{
-    res.sendFile('./public/create.html', { root: __dirname });
+    res.render("create");
   }
 );
 
@@ -705,7 +707,7 @@ app.post('/delete', async (req, res) => {
     // Check if the post was deleted successfully
     if (result.deletedCount === 1) {
       console.log("Post deleted successfully");
-      return res.redirect('/index.html');
+      return res.redirect('/index');
     } else {
       return res.status(404).json({ message: "Post not found or could not be deleted." });
     }
@@ -718,7 +720,7 @@ app.post('/delete', async (req, res) => {
 
 app.get('/signup', (req, res) =>{
 
-  res.sendFile('./public/signup.html', { root: __dirname });
+  res.render("signup");
 
 });
 
@@ -758,10 +760,10 @@ app.post('/signup', async (req, res) => {
 
       // If insertion is successful, respond with a success message
       if (result.insertedCount === 1) {
-          return res.redirect('/login.html'); // Redirect to login page
+          return res.redirect('/login'); // Redirect to login page
       } else {
           // If insertion failed for some reason
-          return res.redirect('/login.html'); // Redirect to login page
+          return res.redirect('/login'); // Redirect to login page
       }
   } catch (error) {
       console.error("Error occurred during signup:", error);
@@ -771,7 +773,7 @@ app.post('/signup', async (req, res) => {
 
 app.get('/editPost', (req, res) =>{
 
-  res.sendFile('./public/editPost.html', { root: __dirname });
+  res.render("editPost");
 
 });
 
@@ -807,7 +809,7 @@ app.post('/editPost', async (req, res) => {
     // Check if the post was updated successfully
     if (result.modifiedCount === 1) {
       console.log("Post edited successfully");
-      return res.redirect('/index.html');
+      return res.redirect('/index');
     } else {
       return res.status(404).json({ message: "Post not found or could not be updated." });
     }
@@ -819,25 +821,25 @@ app.post('/editPost', async (req, res) => {
 
 
 app.get('/editProfile', (req, res) =>{
-
-  res.sendFile('./public/editProfile.html', { root: __dirname });
+  
+  res.render("editProfile");
 
 });
 
 app.get('/viewpost', (req, res) =>{
 
-  res.sendFile('./public/viewpost.html', { root: __dirname });
+  res.render("viewpost");
 
 });
 
 app.post('/viewpost', (req, res) =>{
 
-  res.sendFile('./public/viewpost.html', { root: __dirname });
+  res.render("viewpost");
 
 });
 
 app.get('/about', (req, res) =>{
 
-  res.sendFile('./public/about.html', { root: __dirname });
+  res.render("about");
 
 });

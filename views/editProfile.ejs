@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+
+        <title>Home Page</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script type ="text/javascript" src="editProfile.js" defer></script>
+
+    </head>
+
+    <body style="overflow: hidden;">
+
+        <table class="main">
+        <!--Header Box-->
+            <%- include("partials/header") %>
+
+            <tr>
+            <!--Side Box-->    
+                <%- include("partials/sidebar") %>
+
+                <!--Content here (images are placeholders)-->
+                <td>
+                    <div class="postWindow">
+                        
+                        <!-- This section is for profile things-->
+                        <form action = '/editProfile' method="POST">
+                            <div class="profileWindow">
+                                    <img class="profilePic" id="profilePic">
+                                        
+                                    <div class="personalInfoWindow">
+                                        <p class="personalInput">
+                                            Username:<input type="text" id="usernameInput" name="usernameInput"></input></br>
+                                            Gender:<input type="text" id="genderInput" name="genderInput"></input></br>
+                                            DLSU ID:<input type="number" id="dlsuIDInput" name="dlsuIDInput"></input></br>
+                                            Role:<input type="text" id="roleInput" name="roleInput"></input></br>
+                                            <br><br>
+                                            Profile Picture link:<input type="text" id="profilePicInput" name="profilePicInput"></input></br>        
+                                        </p>
+                                    </div>
+
+                                    <div class="descriptionWindow">
+                                        <textarea class ="descEdit" name="descInput" id="descInput"></textarea>
+                                    </div>
+
+                                    <button value="Confirm" type="submit" class="confirmProfileButton">Confirm</button>
+                            </div>
+                        </form>
+
+                    </div>
+                </td>
+
+            </tr>
+        </table>    
+                
+    </body>
+
+</html>

@@ -29,8 +29,8 @@ $(document).ready(function () {
                 });
 
             newPost.attr('id',"");
-            newPost.find(".username").attr('href', 'profile.html?userID=' + post.authorID);
-            newPost.find(".viewPostLink").attr('href', 'viewpost.html?postID=' + String(post._id));
+            newPost.find(".username").attr('href', '/profile?userID=' + post.authorID);
+            newPost.find(".viewPostLink").attr('href', '/viewpost?postID=' + String(post._id));
             newPost.find(".date").text(post.date);
             newPost.find(".subject").text(post.subject);
             newPost.find(".message").text(post.message);
@@ -88,8 +88,8 @@ $(document).ready(function () {
 
 
                 newTrend.find(".viewPostLink").text(post.subject);
-                newTrend.find(".viewPostLink").attr('href', 'viewpost.html?postID=' + String(post._id));
-                newTrend.find(".username").attr('href', 'profile.html?userID=' + post.authorID);
+                newTrend.find(".viewPostLink").attr('href', '/viewpost?postID=' + String(post._id));
+                newTrend.find(".username").attr('href', '/profile?userID=' + post.authorID);
                 newTrend.find(".date").text(post.date);
                 newTrend.find(".likes").text(post.likes);
                 newTrend.find(".dislikes").text(post.dislikes);
@@ -142,8 +142,8 @@ $(document).ready(function () {
                 });
 
             newPost.attr('id',"");
-            newPost.find(".username").attr('href', 'profile.html?userID=' + post.authorID);
-            newPost.find(".viewPostLink").attr('href', 'viewpost.html?postID=' + String(post._id));
+            newPost.find(".username").attr('href', '/profile?userID=' + post.authorID);
+            newPost.find(".viewPostLink").attr('href', '/viewpost?postID=' + String(post._id));
             newPost.find(".date").text(post.date);
             newPost.find(".subject").text(post.subject);
             newPost.find(".message").text(post.message);

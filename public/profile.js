@@ -72,8 +72,8 @@ $(document).ready(function () {
                     });
 
                     newPost.attr('id',"");
-                    newPost.find(".username").attr('href', 'profile.html?userID=' + post.authorID);
-                    newPost.find(".viewPostLink").attr('href', 'viewpost.html?postID=' + String(post._id));
+                    newPost.find(".username").attr('href', '/profile?userID=' + post.authorID);
+                    newPost.find(".viewPostLink").attr('href', '/viewpost?postID=' + String(post._id));
                     newPost.find(".date").text(post.date);
                     newPost.find(".subject").text(post.subject);
                     newPost.find(".message").text(post.message);
@@ -97,7 +97,7 @@ $(document).ready(function () {
         console.log('User had: ' + userPostCount + ' posts');
 
         // set the link to "more posts by user" to the send the userID of the current profile
-        document.getElementById('toUserPosts').setAttribute('href', 'userPosts.html?userID=' + userID);
+        document.getElementById('toUserPosts').setAttribute('href', '/userPosts?userID=' + userID);
 
         $(".userPostWindow").append("<div  class='postFooter' style='color: rgb(96, 96, 96);'><p>end of recent history</p></div>");
 

@@ -27,7 +27,7 @@ $(document).ready(function () {
                 document.getElementById('likeCount').textContent = postData[0].likes;
                 document.getElementById('dislikeCount').textContent = postData[0].dislikes;
                 document.getElementById('posterDate').textContent = postData[0].date;
-                document.getElementById('editLink').href = "/editPost.html?postID="+postData[0]._id;
+                document.getElementById('editLink').href = "/editPost?postID="+postData[0]._id;
                 document.getElementById('likeButton').setAttribute("onclick" ,"likeThis('" + postData[0]._id + "', 1)");
                 document.getElementById('dislikeButton').setAttribute("onclick" ,"likeThis('" + postData[0]._id + "', -1)");
 
@@ -63,7 +63,7 @@ $(document).ready(function () {
                 const posterData = await responsePoster.json();
                 document.getElementById('posterPic').src = posterData[0].profilePic;
                 document.getElementById('posterUsername').textContent = posterData[0].username;
-                document.getElementById('posterUsername').href = ('profile.html?userID=' + posterData[0]._id);
+                document.getElementById('posterUsername').href = ('/profile?userID=' + posterData[0]._id);
 
             } catch (error) {
                 console.error("post loading error: ", error);
@@ -111,7 +111,7 @@ $(document).ready(function () {
         
                     newComment.find(".comment").text(comment.comment);
                     newComment.find(".commentDate").text(comment.date);
-                    newComment.find(".username").attr('href', 'profile.html?userID=' + String(comment.authorID));
+                    newComment.find(".username").attr('href', '/profile?userID=' + String(comment.authorID));
                     newComment.find(".likeButton").attr("onclick" ,"likeThis('" + commentObjID + "', 1)");
                     newComment.find(".dislikeButton").attr("onclick" ,"likeThis('" + commentObjID + "', -1)");
                     newComment.find(".commentLikeCount").text(comment.likes);
