@@ -33,7 +33,7 @@ var curUser; // should be a user
 app.use(express.urlencoded({ extended: true })); // Add this line for form data
 
 // MongoDB connection setup
-const uri = "mongodb+srv://ZTORlIlsVr6pGCNc:ZTORlIlsVr6pGCNc@cluster0.bvg7nag.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const uri = "";
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
