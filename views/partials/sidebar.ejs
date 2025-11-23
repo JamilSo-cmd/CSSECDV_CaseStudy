@@ -9,6 +9,11 @@
         <a href="/editProfile"><div id="sideButton" class="highlight" style="top:240px;"><p>EDIT PROFILE</p></div></a>
             
         <a href="/userList"><div id="sideButton" class="highlight" style="top:320px;"><p>USER LIST</p></div></a>
+        
+        <!-- Admin Only: Logs Button - SAFE VERSION -->
+        <% if (typeof user !== 'undefined' && user && user.dlsuRole === 'admin') { %>
+            <a href="/logs"><div id="sideButton" class="highlight" style="top:400px;"><p>SYSTEM LOGS</p></div></a>
+        <% } %>
             
         <a href="/create"><div id="sideButton" class="highlight" style="top:650px;"><p>+ CREATE POST</p></div></a>
 
