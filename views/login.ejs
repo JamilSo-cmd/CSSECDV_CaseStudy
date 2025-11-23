@@ -14,16 +14,6 @@
             font-size: 14px;
         }
 
-        .attempts-warning {
-            color: #f57c00;
-            background-color: #fff3e0;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            border-left: 4px solid #f57c00;
-            font-size: 13px;
-        }
-
         .lockout-timer {
             color: #d32f2f;
             font-weight: bold;
@@ -60,12 +50,6 @@
             <% if (typeof error !== 'undefined' && error) { %>
                 <div class="error-message">
                     <%= error %>
-                </div>
-            <% } %>
-
-            <% if (typeof attemptsLeft !== 'undefined' && attemptsLeft <= 3 && attemptsLeft > 0) { %>
-                <div class="attempts-warning">
-                    Warning: Only <%= attemptsLeft %> login attempt<%= attemptsLeft === 1 ? '' : 's' %> remaining before account lockout!
                 </div>
             <% } %>
 

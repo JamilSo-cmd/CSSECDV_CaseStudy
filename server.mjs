@@ -724,14 +724,51 @@ app.post('/reset-password', async (req, res) => {
         return res.render("reset-password", { step: 1, error: "No security question set for this account. Please contact support." });
       }
 
+      // **NEW: Check if 24 hours have passed since last password change**
+      if (user.lastPasswordChange) {
+        const hoursSinceLastChange = (Date.now() - new Date(user.lastPasswordChange).getTime()) / (1000 * 60 * 60);
+        
+        if (hoursSinceLastChange < 24) {
+          const hoursRemaining = Math.ceil(24 - hoursSinceLastChange);
+          const minutesRemaining = Math.ceil((24 - hoursSinceLastChange) * 60) % 60;
+          
+          logEvent(req, 'warn', `Password reset blocked due to 24-hour cooldown: ${email}`, user._id.toString());
+          return res.render("reset-password", { 
+            step: 1, 
+            error: `Password was recently changed. Please wait ${hoursRemaining} hour(s) and ${minutesRemaining} minute(s) before resetting again.`,
+            cooldown: true,
+            hoursRemaining: hoursRemaining,
+            minutesRemaining: minutesRemaining
+          });
+        }
+      }
+
       logEvent(req, 'info', `Password reset initiated for: ${email}`, user._id.toString());
-      return res.render("freset-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: null });
+      return res.render("reset-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: null });
     }
 
     if (email && securityAnswer && newPassword) {
       const user = await usersCollection.findOne({ email: email });
       if (!user) {
         return res.render("reset-password", { step: 1, error: "Email address not found." });
+      }
+
+      // **ADDITIONAL CHECK: Verify 24-hour cooldown again at submission**
+      if (user.lastPasswordChange) {
+        const hoursSinceLastChange = (Date.now() - new Date(user.lastPasswordChange).getTime()) / (1000 * 60 * 60);
+        
+        if (hoursSinceLastChange < 24) {
+          const hoursRemaining = Math.ceil(24 - hoursSinceLastChange);
+          const minutesRemaining = Math.ceil((24 - hoursSinceLastChange) * 60) % 60;
+          
+          logEvent(req, 'warn', `Password reset blocked at submission due to 24-hour cooldown: ${email}`, user._id.toString());
+          return res.render("reset-password", { 
+            step: 2,
+            email: email,
+            securityQuestion: user.securityQuestion,
+            error: `Password was recently changed. Please wait ${hoursRemaining} hour(s) and ${minutesRemaining} minute(s) before resetting again.`
+          });
+        }
       }
 
       if (user.securityAnswer.toLowerCase() !== securityAnswer.toLowerCase()) {
@@ -783,14 +820,15 @@ app.post('/reset-password', async (req, res) => {
       // Keep only the last 5 passwords in history
       const trimmedHistory = updatedHistory.slice(-5);
 
-      // Update with new password and history
+      // **UPDATE: Set lastPasswordChange to current timestamp**
       await usersCollection.updateOne(
         { email: email },
         { 
           $set: { 
             password: hashedPassword,
             passwordHistory: trimmedHistory,
-            failedLoginAttempts: 0
+            failedLoginAttempts: 0,
+            lastPasswordChange: new Date() // **UPDATED: Track password change time**
           },
           $unset: { lockUntil: "" }
         }
@@ -999,7 +1037,7 @@ app.post('/signup', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Insert the user data into the database
+    // **UPDATED: Insert with lastPasswordChange field**
     const result = await usersCollection.insertOne({
       email: email,
       username: username,
@@ -1012,7 +1050,8 @@ app.post('/signup', async (req, res) => {
       securityQuestion: securityQuestion || "What is your favorite color?",
       securityAnswer: securityAnswer || "",
       failedLoginAttempts: 0,
-      passwordHistory: []
+      passwordHistory: [],
+      lastPasswordChange: new Date() // **NEW: Track initial password creation time**
     });
 
     if (result.insertedId) {
@@ -1193,6 +1232,37 @@ app.get("/userListData", async (req, res) => {
   } catch (error) {
     logEvent(req, 'error', `Error fetching user list: ${error.message}`, req.session.userInfo?._id?.toString());
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// **NEW MIGRATION ENDPOINT: One-time migration for existing users**
+// Remove this endpoint after running it once
+app.get('/migrate-password-timestamps', async (req, res) => {
+  try {
+    // Security: Only allow admin access
+    if (!req.session.userInfo || req.session.userInfo.dlsuRole !== 'admin') {
+      logEvent(req, 'warn', 'Unauthorized migration attempt', req.session.userInfo?._id?.toString());
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const usersCollection = client.db("ForumsDB").collection("Users");
+    
+    // Update all users who don't have lastPasswordChange
+    const result = await usersCollection.updateMany(
+      { lastPasswordChange: { $exists: false } },
+      { $set: { lastPasswordChange: new Date() } }
+    );
+
+    logEvent(req, 'info', `Password timestamp migration completed: ${result.modifiedCount} users updated`, req.session.userInfo._id.toString());
+    
+    res.json({ 
+      message: "Migration completed successfully", 
+      usersUpdated: result.modifiedCount 
+    });
+  } catch (error) {
+    logEvent(req, 'error', `Migration error: ${error.message}`, req.session.userInfo?._id?.toString());
+    console.error("Migration error:", error);
+    res.status(500).json({ error: "Migration failed" });
   }
 });
 
