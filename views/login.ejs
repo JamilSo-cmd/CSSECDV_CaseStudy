@@ -3,23 +3,128 @@
 <head>
     <title>Login Page</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .error-message {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border-left: 4px solid #d32f2f;
+            font-size: 14px;
+        }
+
+        .attempts-warning {
+            color: #f57c00;
+            background-color: #fff3e0;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border-left: 4px solid #f57c00;
+            font-size: 13px;
+        }
+
+        .lockout-timer {
+            color: #d32f2f;
+            font-weight: bold;
+            font-size: 16px;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .forgot-password-link {
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .forgot-password-link a {
+            color: #1976d2;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .forgot-password-link a:hover {
+            text-decoration: underline;
+        }
+
+        .disabled-input {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+        }
+    </style>
 </head>
 <body class="login-background-image" background="https://1.bp.blogspot.com/-xyja6oSYgKA/Xa6NjVrvPAI/AAAAAAAAFpM/yjH0mh21a0IE_xynFmKbLqt1pX5GW_d8ACLcBGAsYHQ/w1200-h630-p-k-no-nu/De%2BLa%2BSalle%2BUniversity%2B%25281%2529.jpg">
     <h1 style="text-align: center;">LOG IN</h1>
     <div class="logincontainer">
         <div class="inputcontainer">
-            <form action="/login" method="post">
+            <% if (typeof error !== 'undefined' && error) { %>
+                <div class="error-message">
+                    <%= error %>
+                </div>
+            <% } %>
 
+            <% if (typeof attemptsLeft !== 'undefined' && attemptsLeft <= 3 && attemptsLeft > 0) { %>
+                <div class="attempts-warning">
+                    ⚠️ Warning: Only <%= attemptsLeft %> login attempt<%= attemptsLeft === 1 ? '' : 's' %> remaining before account lockout!
+                </div>
+            <% } %>
+
+            <% if (typeof lockout !== 'undefined' && lockout) { %>
+                <div class="lockout-timer" id="lockoutTimer">
+                    Account locked for <span id="countdown"><%= remainingTime %></span> seconds
+                </div>
+                <script>
+                    let timeLeft = <%= remainingTime %>;
+                    const countdownElement = document.getElementById('countdown');
+                    
+                    const timer = setInterval(() => {
+                        timeLeft--;
+                        countdownElement.textContent = timeLeft;
+                        
+                        if (timeLeft <= 0) {
+                            clearInterval(timer);
+                            window.location.reload();
+                        }
+                    }, 1000);
+                </script>
+            <% } %>
+
+            <form action="/login" method="post" id="loginForm">
                 <label for="email">DLSU E-mail Address:</label><br><br>
-                <input type="email" id="dlsuemail" name="email" required><br><br>
+                <input type="email" 
+                       id="dlsuemail" 
+                       name="email" 
+                       required 
+                       <%= (typeof lockout !== 'undefined' && lockout) ? 'disabled class="disabled-input"' : '' %>><br><br>
+                
                 <label for="password">Password:</label><br><br>
-                <input type="password" id="password" name="password" required><br><br><br>
+                <input type="password" 
+                       id="password" 
+                       name="password" 
+                       required 
+                       <%= (typeof lockout !== 'undefined' && lockout) ? 'disabled class="disabled-input"' : '' %>><br><br><br>
 
-                <input type="submit" value="Login"><br><br>
+                <input type="submit" 
+                       value="Login" 
+                       <%= (typeof lockout !== 'undefined' && lockout) ? 'disabled' : '' %>><br><br>
+
+                <div class="forgot-password-link">
+                    <a href="/forgot-password">Forgot your password?</a>
+                </div>
 
                 <p>Don't have an account yet? <span><a class="signup-button" href="/signup">Sign up here!</a></span></p>
             </form>
         </div>
     </div>
+
+    <% if (typeof lockout !== 'undefined' && lockout) { %>
+        <script>
+            // Disable form submission during lockout
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                alert('Please wait for the lockout period to end.');
+            });
+        </script>
+    <% } %>
 </body>
 </html>
