@@ -32,6 +32,7 @@ app.use(session(
 var curUser; // should be a user
 
 app.use(express.urlencoded({ extended: true })); // Add this line for form data
+app.use(express.json()); // Add this for JSON parsing
 
 // MongoDB connection setup
 const uri = process.env.MONGODB_CONN;
@@ -274,17 +275,16 @@ app.get('/updateLikes', async (req, res) => {
       await postCollection.updateOne({_id: postObjID}, {$set: {likes: 0}})
       await postCollection.updateOne({_id: postObjID}, {$set: {dislikes: 0}})
 
-      // iterate through each like/dislike that matches with the postID target
       likeArray.forEach((like) => {
         if(like.like == '1') {
           console.log('logged a like');
           postCollection.updateOne({_id: postObjID}, {$inc: {likes: 1}})
-        }
-        else if(like.like == '-1') {
+        } else if (like.like == '-1') {
           console.log('logged a dislike');
           postCollection.updateOne({_id: postObjID}, {$inc: {dislikes: 1}})
         }
-      }) 
+      })
+      
     }
     else {
       postTarget = await commCollection.findOne({_id: postObjID});
@@ -302,285 +302,349 @@ app.get('/updateLikes', async (req, res) => {
             commCollection.updateOne({_id: postObjID}, {$inc: {dislikes: 1}})
           }
         })
-    }}
 
-
-  }
-  else {
-    console.log('no postID given to update for');
-    return res.status(404).json({ message: "Post not found." });
-  }
-})
-
-app.get('/trending',async (req,res)=> {
-
-  const postCollection = client.db("ForumsDB").collection("Posts");
-  
-  // Execute query 
-  const cursor = postCollection.find().sort({likes:-1});
-  
-  // Print a message if no documents were found
-  if ((postCollection.countDocuments()) === 0) {
-    console.log("No documents found!");
-  }
-
-  const array =  await cursor.toArray();
-
-  res.status(200).json(array);
-  
-
-});
-
-// gets a single post (WIP)
-app.get('/onePost', async (req,res) =>{
-
-  try{
-    const postCollection = client.db("ForumsDB").collection("Posts");
-    var postID = req.header('postID');
-    var postObjID = new ObjectId(postID);
-
-    console.log('Received post ID: ' + postID);
-
-    // Execute query 
-    var postToSend = await postCollection.findOne({ _id: postObjID });
-
-    console.log('post found to send has the subject of: ' + postToSend.subject);
-    
-    const postData = [{
-      '_id': postToSend._id, 
-      'subject': postToSend.subject,
-      'message': postToSend.message,
-      'tag': postToSend.tag,
-      'date': postToSend.date,
-      'dislikes': postToSend.dislikes,
-      'likes': postToSend.likes,
-      'authorID': postToSend.authorID
-    }];
-
-    // sends post back
-    if(postData) {
-      console.log("post sent");
-      res.json(postData);
-    }
-    else {
-      console.error('Error finding post to send back', error);
-      return res.status(404).json({ message: "Post not found." });
-    }
-
-  } catch (error) {
-    console.log("Error locating single post", error);
-  }
-
-});
-
-// gets a single comment
-app.get('/oneComment', async (req,res) =>{
-
-  try{
-    const commCollection = client.db("ForumsDB").collection("Comments");
-    var commID = req.header('commID');
-    var commObjID = new ObjectId(commID);
-
-    console.log('Received comment ID: ' + commID);
-
-    // Execute query 
-    var commToSend = await commCollection.findOne({ _id: commObjID });
-
-    console.log('comment found to send has the subject of: ' + commToSend.comment);
-    
-    const commData = [{
-      '_id': commToSend._id,
-      'comment': commToSend.comment,
-      'date': commToSend.date,
-      'authorID': commToSend.authorID
-    }];
-
-    // sends comment back
-    if(commData) {
-      console.log("comment sent");
-      res.json(commData);
-    }
-    else {
-      console.error('Error finding comment to send back', error);
-      return res.status(404).json({ message: "Comment not found." });
-    }
-
-  } catch (error) {
-    console.log("Error locating single comment", error);
-  }
-
-});
-
-app.get('/categories',async (req,res)=>{
-
-  const postCollection = client.db("ForumsDB").collection("Posts");
-
-  // Execute query 
-  const cursor = await postCollection.distinct("tag");
-
-  // Print a message if no documents were found
-  if ((postCollection.countDocuments()) === 0) {
-    console.log("No documents found!");
-  }
-  
-  res.status(200).json(cursor);
-  
-});
-
-//in progress (trying to fix query)
-app.get('/filter', async (req, res) => {
-
-  const postCollection = client.db("ForumsDB").collection("Posts");
-  const searchStr = req.query.search;
-  const sortStr = req.query.sort;
-  const categoryStr = req.query.category;
-
-  console.log("looking for: "+searchStr)
-  console.log("sorted  by:  "+sortStr)
-  console.log("with category: "+categoryStr)
-  console.log("----------------------------")
-
-  const query = {
-    subject:{$regex:searchStr},
-    tag:{$regex:categoryStr}
-  }
-
-  //sort by newest
-  let sort = {};
-
-  if (sortStr == "Alphabetical"){
-
-    sort = {subject:-1}
-
-  }
-  else if (sortStr == "Oldest"){
-
-    sort = {_id:-1}
-
-  }
-
-
-  // Execute query 
-  const cursor = postCollection.find(query).collation({'locale':'en'}).sort(sort);
-
-  // Print a message if no documents were found
-  if ((postCollection.countDocuments()) === 0) {
-    console.log("No documents found!");
-  }
-
-  const array =  await cursor.toArray();
-
-  
-  res.status(200).json(array);
-})
-
-app.get('/login', (req, res) =>{
-    res.render("login");
-
-});
-
-// Handle editing profile and validation that username is unique (WIP)
-app.post('/editProfile', async (req, res) => {
-  try {
-    console.log("edit Profile function started");
-    const { usernameInput, profilePicInput, genderInput, dlsuIDInput, roleInput, descInput } = req.body;
-    const usersCollection = client.db("ForumsDB").collection("Users");
-    const user = await usersCollection.findOne({ username: curUser.username });
-
-    if (!user) {
-      console.error("User editing error: User not found");
-      return res.status(404).json({ message: "User not found." });
-    } else {
-      if (usernameInput) {
-        // Check if the new username already exists in the database
-        const existingUser = await usersCollection.findOne({ username: usernameInput });
-        if (existingUser && existingUser.username !== curUser.username) {
-          console.error("User editing error: Username already exists");
-          return res.status(400).json({ message: "Username already exists." });
-        }
       }
 
-      const filter = { username: curUser.username };
+    }
+
+  }
+
+});
+
+app.get('/logout', (req, res) => {
+  // Destroy the session
+  req.session.destroy((err) => {
+      if (err) {
+          console.error("Error destroying session:", err);
+          return res.status(500).json({ message: "Internal server error." });
+      }
+      curUser = null; // Clear the global variable
+      res.clearCookie('SessionCookie'); // Clear the session cookie
+      res.redirect('/login');
+  });
+});
+
+app.get('/profile-edit', (req, res) =>{
+  res.render("profile-edit")
+});
+
+app.post('/profile-edit', async (req,res) => {
+
+  let userID = req.session.userInfo._id;
+
+  try {
+
+      const usersCollection = client.db("ForumsDB").collection("Users");
+
+      const {username,description,dlsuRole,dlsuID,gender,profilePic} = req.body;
+
+      const filter = {_id: new ObjectId(userID)};
       const updates = {};
 
-      if (usernameInput) {
-        updates.username = usernameInput;
+      if (username) {
+        updates.username = username;
       }
-      if (profilePicInput) {
-        updates.profilePic = profilePicInput;
+      if (description) {
+        updates.description = description;
       }
-      if (genderInput) {
-        updates.gender = genderInput;
+      if (dlsuRole) {
+        updates.dlsuRole = dlsuRole;
       }
-      if (dlsuIDInput) {
-        updates.dlsuID = dlsuIDInput;
+      if (dlsuID) {
+        updates.dlsuID = dlsuID;
       }
-      if (roleInput) {
-        updates.dlsuRole = roleInput;
+      if (gender) {
+        updates.gender = gender;
       }
-      if (descInput) {
-        updates.description = descInput;
+      if (profilePic) {
+        updates.profilePic = profilePic;
       }
 
       // Update the user document with the accumulated updates
-      await usersCollection.updateOne(filter, { $set: updates });
+      const result = await usersCollection.updateOne(filter, { $set: updates });
 
-      // Update curUser with the new profile information
-      if (curUser) {
-        if (usernameInput) curUser.username = usernameInput;
-        if (profilePicInput) curUser.profilePic = profilePicInput;
-        if (genderInput) curUser.gender = genderInput;
-        if (dlsuIDInput) curUser.dlsuID = dlsuIDInput;
-        if (roleInput) curUser.dlsuRole = roleInput;
-        if (descInput) curUser.description = descInput;
+      if (result.modifiedCount === 1) {
+        console.log("User edited successfully");
+
+        const result2 = await usersCollection.findOne(filter);
+        console.log(result2);
+        req.session.userInfo = result2;
+
+        return res.redirect('/profile');
+      } else {
+        return res.status(404).json({ message: "User not found or could not be updated." });
       }
 
-      console.log("User profile updated successfully");
-      return res.redirect('/profile');
-      
-      
-    }
   } catch (error) {
-    console.error("Error occurred during editing of profile info", error);
-    return res.status(500).json({ message: "Internal server error." });
+      console.error("Error occurred during user edit:", error);
+      return res.status(500).json({ message: "Internal server error." });
   }
+
 });
 
-// Handle logging in and validation that user exists in DB
+app.get('/userPosts', async (req,res) =>{
+
+  let userID = req.header('userID');
+
+  if(userID){
+    try{
+      const postCollection = client.db("ForumsDB").collection("Posts");
+      // Execute query 
+      const cursor = postCollection.find({authorID:userID});
+    
+      // Print a message if no documents were found
+      if ((await postCollection.countDocuments({authorID:userID})) === 0) {
+        console.log("No documents found!");
+      }
+    
+      const array =  await cursor.toArray();
+    
+      res.status(200).json(array);
+    }
+    catch(error){
+      console.error("Error locating user posts");
+    }
+  }
+  
+});
+
+app.get('/login', (req, res) =>{
+
+  res.render("login", { error: null });
+
+});
+
+// Handle login process with attempt tracking and lockout
 app.post('/login', async (req, res) => {
   try {
-    // Extract email and password from the request body
     const { email, password } = req.body;
 
-    // Make sure email and password are provided
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required." });
+      return res.render("login", { error: "Email and password are required." });
     }
 
-    // 'users' collection in MongoDB database
     const usersCollection = client.db("ForumsDB").collection("Users");
+    const user = await usersCollection.findOne({ email: email });
 
-    // Find user with the provided email and password
-    const user = await usersCollection.findOne({ email: email});
-
-    const match = await bcrypt.compare(password,user.password);
-    
-    if (!match) {
-      return res.redirect('/login?error=invalid_credentials');
+    if (!user) {
+      return res.render("login", { error: "Invalid email or password." });
     }
-    
 
-    // If authentication successful, redirect to profile page or dashboard
-    curUser = user; // assigns global variable to the user who just logged in
-    req.session.userInfo = user; // sets session userInfo to be user who just logged in (WIP)
-    console.log('User logged in: ' + req.session.userInfo.username); // to see if the username was gotten correctly
-    return res.redirect('/index'); // Change the redirect URL as needed
+    // Check if account is locked
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingTime = Math.ceil((user.lockUntil - Date.now()) / 1000);
+      return res.render("login", { 
+        error: `Account is locked. Please try again in ${remainingTime} seconds.`,
+        lockout: true,
+        remainingTime: remainingTime
+      });
+    }
+
+    // Check password
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      // Increment failed login attempts
+      const failedAttempts = (user.failedLoginAttempts || 0) + 1;
+      const updates = { failedLoginAttempts: failedAttempts };
+
+      // Lock account after 5 failed attempts
+      if (failedAttempts >= 5) {
+        updates.lockUntil = Date.now() + 30000; // Lock for 30 seconds
+        updates.failedLoginAttempts = 0; // Reset counter after locking
+        
+        await usersCollection.updateOne(
+          { email: email },
+          { $set: updates }
+        );
+
+        return res.render("login", { 
+          error: "Too many failed login attempts. Account locked for 30 seconds.",
+          lockout: true,
+          remainingTime: 30
+        });
+      }
+
+      // Update failed attempts
+      await usersCollection.updateOne(
+        { email: email },
+        { $set: updates }
+      );
+
+      const attemptsLeft = 5 - failedAttempts;
+      return res.render("login", { 
+        error: `Invalid email or password. ${attemptsLeft} attempt(s) remaining.`,
+        attemptsLeft: attemptsLeft
+      });
+    }
+
+    // Successful login - reset failed attempts and lock
+    await usersCollection.updateOne(
+      { email: email },
+      { 
+        $set: { failedLoginAttempts: 0 },
+        $unset: { lockUntil: "" }
+      }
+    );
+
+    // Set session and redirect
+    req.session.userInfo = user;
+    curUser = user;
+    console.log("User logged in successfully");
+    return res.redirect('/index');
 
   } catch (error) {
     console.error("Error occurred during login:", error);
-    return res.status(500).json({ message: "Internal server error." });
+    return res.render("login", { error: "Internal server error." });
   }
 });
+
+// Forgot password page
+app.get('/forgot-password', (req, res) => {
+  res.render("forgot-password", { step: 1, error: null });
+});
+
+// Handle forgot password - verify email and security question
+app.post('/forgot-password', async (req, res) => {
+  try {
+    const { email, securityAnswer, newPassword, confirmPassword } = req.body;
+    const usersCollection = client.db("ForumsDB").collection("Users");
+
+    // Step 1: Verify email and show security question
+    if (email && !securityAnswer) {
+      const user = await usersCollection.findOne({ email: email });
+      
+      if (!user) {
+        return res.render("forgot-password", { 
+          step: 1, 
+          error: "Email address not found." 
+        });
+      }
+
+      // If user doesn't have a security question set, show error
+      if (!user.securityQuestion || !user.securityAnswer) {
+        return res.render("forgot-password", { 
+          step: 1, 
+          error: "No security question set for this account. Please contact support." 
+        });
+      }
+
+      return res.render("forgot-password", { 
+        step: 2, 
+        email: email,
+        securityQuestion: user.securityQuestion,
+        error: null 
+      });
+    }
+
+    // Step 2: Verify security answer and reset password
+    if (email && securityAnswer && newPassword) {
+      const user = await usersCollection.findOne({ email: email });
+
+      if (!user) {
+        return res.render("forgot-password", { 
+          step: 1, 
+          error: "Email address not found." 
+        });
+      }
+
+      // Verify security answer (case-insensitive)
+      if (user.securityAnswer.toLowerCase() !== securityAnswer.toLowerCase()) {
+        return res.render("forgot-password", { 
+          step: 2,
+          email: email,
+          securityQuestion: user.securityQuestion,
+          error: "Incorrect answer to security question." 
+        });
+      }
+
+      // Validate new password
+      if (newPassword !== confirmPassword) {
+        return res.render("forgot-password", { 
+          step: 2,
+          email: email,
+          securityQuestion: user.securityQuestion,
+          error: "Passwords do not match." 
+        });
+      }
+
+      // Validate password requirements
+      const passwordValidation = validatePassword(newPassword);
+      if (!passwordValidation.isValid) {
+        return res.render("forgot-password", { 
+          step: 2,
+          email: email,
+          securityQuestion: user.securityQuestion,
+          error: passwordValidation.message 
+        });
+      }
+
+      // Hash new password and update
+      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+      await usersCollection.updateOne(
+        { email: email },
+        { 
+          $set: { 
+            password: hashedPassword,
+            failedLoginAttempts: 0
+          },
+          $unset: { lockUntil: "" }
+        }
+      );
+
+      return res.render("forgot-password", { 
+        step: 3,
+        success: true,
+        error: null 
+      });
+    }
+
+  } catch (error) {
+    console.error("Error during password reset:", error);
+    return res.render("forgot-password", { 
+      step: 1, 
+      error: "Internal server error." 
+    });
+  }
+});
+
+// Password validation function
+function validatePassword(password) {
+  const minLength = 8;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+
+  if (password.length < minLength) {
+    return { 
+      isValid: false, 
+      message: `Password must be at least ${minLength} characters long.` 
+    };
+  }
+
+  if (!hasUpperCase) {
+    return { 
+      isValid: false, 
+      message: "Password must contain at least one uppercase letter." 
+    };
+  }
+
+  if (!hasNumber) {
+    return { 
+      isValid: false, 
+      message: "Password must contain at least one number." 
+    };
+  }
+
+  if (!hasSpecialChar) {
+    return { 
+      isValid: false, 
+      message: "Password must contain at least one special character (!@#$%^&*()_+-=[]{};':\"\\|,.<>/?)" 
+    };
+  }
+
+  return { isValid: true, message: "Password is valid." };
+}
 
 // function for getting profile info
 app.get('/userData', async (req, res) => {
@@ -720,30 +784,61 @@ app.post('/delete', async (req, res) => {
 
 app.get('/signup', (req, res) =>{
 
-  res.render("signup");
+  res.render("signup", { error: null });
 
 });
 
-// Handle registering users to the DB
+// Handle registering users to the DB with enhanced validation
 app.post('/signup', async (req, res) => {
   try {
-      // Extract email, username, and password from the request body
-      const { email, username, password } = req.body;
+      const { email, username, password, confirmpassword, securityQuestion, securityAnswer } = req.body;
       
       // Make sure all required fields are provided
-      if (!email || !username || !password) {
-          return res.status(400).json({ message: "Email, username, and password are required." });
+      if (!email || !username || !password || !confirmpassword) {
+          return res.render("signup", { 
+            error: "All fields are required." 
+          });
       }
 
-      const hashedPassword = await new Promise((resolve, reject) => {
-        bcrypt.hash(password, saltRounds, function(err, hash) {
-          if (err) reject(err)
-          resolve(hash)
-        });
-      })
+      // Check if passwords match
+      if (password !== confirmpassword) {
+          return res.render("signup", { 
+            error: "Passwords do not match." 
+          });
+      }
 
-      // 'users' collection in MongoDB database
+      // Validate password strength
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+          return res.render("signup", { 
+            error: passwordValidation.message 
+          });
+      }
+
       const usersCollection = client.db("ForumsDB").collection("Users");
+
+      // Check if username already exists (case-insensitive)
+      const existingUsername = await usersCollection.findOne({ 
+        username: { $regex: new RegExp(`^${username}$`, 'i') } 
+      });
+      
+      if (existingUsername) {
+          return res.render("signup", { 
+            error: "Username already exists. Please choose a different username." 
+          });
+      }
+
+      // Check if email already exists
+      const existingEmail = await usersCollection.findOne({ email: email });
+      
+      if (existingEmail) {
+          return res.render("signup", { 
+            error: "Email address already registered. Please use a different email." 
+          });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
 
       // Insert the user data into the database
       const result = await usersCollection.insertOne({
@@ -754,20 +849,26 @@ app.post('/signup', async (req, res) => {
           description: "",
           dlsuID: "",
           dlsuRole: "",
-          role:"member",
-          gender: ""
+          role: "member",
+          gender: "",
+          securityQuestion: securityQuestion || "What is your favorite color?",
+          securityAnswer: securityAnswer || "",
+          failedLoginAttempts: 0
       });
 
       // If insertion is successful, respond with a success message
-      if (result.insertedCount === 1) {
-          return res.redirect('/login'); // Redirect to login page
+      if (result.insertedId) {
+          return res.redirect('/login');
       } else {
-          // If insertion failed for some reason
-          return res.redirect('/login'); // Redirect to login page
+          return res.render("signup", { 
+            error: "Failed to create account. Please try again." 
+          });
       }
   } catch (error) {
       console.error("Error occurred during signup:", error);
-      return res.status(500).json({ message: "Internal server error." });
+      return res.render("signup", { 
+        error: "Internal server error. Please try again later." 
+      });
   }
 });
 

@@ -5,18 +5,106 @@
 
         <title>Signup Page</title>
         <link rel="stylesheet" href="style.css">
+        <style>
+            .error-message {
+                color: #d32f2f;
+                background-color: #ffebee;
+                padding: 12px;
+                border-radius: 4px;
+                margin-bottom: 15px;
+                border-left: 4px solid #d32f2f;
+                font-size: 14px;
+            }
+
+            .password-requirements {
+                background-color: #e3f2fd;
+                padding: 12px;
+                border-radius: 4px;
+                margin-bottom: 15px;
+                border-left: 4px solid #1976d2;
+                font-size: 13px;
+            }
+
+            .password-requirements h4 {
+                margin-top: 0;
+                color: #1565c0;
+            }
+
+            .password-requirements ul {
+                margin: 5px 0;
+                padding-left: 20px;
+            }
+
+            .password-requirements li {
+                margin: 3px 0;
+            }
+
+            .requirement-met {
+                color: #388e3c;
+            }
+
+            .requirement-unmet {
+                color: #d32f2f;
+            }
+
+            .password-strength {
+                margin-top: 5px;
+                height: 5px;
+                background-color: #e0e0e0;
+                border-radius: 3px;
+                overflow: hidden;
+            }
+
+            .password-strength-bar {
+                height: 100%;
+                transition: width 0.3s ease;
+            }
+
+            .strength-weak {
+                width: 33%;
+                background-color: #d32f2f;
+            }
+
+            .strength-medium {
+                width: 66%;
+                background-color: #f57c00;
+            }
+
+            .strength-strong {
+                width: 100%;
+                background-color: #388e3c;
+            }
+        </style>
 
     </head>
 
     <body class="signup-background-image" background="https://helios-i.mashable.com/imagery/articles/00apgKgIAO4EnFfjOgCApRe/hero-image.fill.size_1248x702.v1619086604.jpg">
 
         <h1 style="text-align: center;">SIGN UP</h1>
-        <p style="text-align: center;">NOTE: DB implemented</p>
         
         <!--Containers for Signup-->
         <div class="signupcontainer">
             <div class="signup-inputcontainer">
-                <form action="/signup" method="post" onsubmit="return matchPassword()">
+                <% if (typeof error !== 'undefined' && error) { %>
+                    <div class="error-message">
+                        <%= error %>
+                    </div>
+                <% } %>
+
+                <div class="password-requirements">
+                    <h4>Password Requirements:</h4>
+                    <ul id="requirements">
+                        <li id="req-length" class="requirement-unmet">✗ At least 8 characters</li>
+                        <li id="req-uppercase" class="requirement-unmet">✗ At least one uppercase letter</li>
+                        <li id="req-number" class="requirement-unmet">✗ At least one number</li>
+                        <li id="req-special" class="requirement-unmet">✗ At least one special character (!@#$%^&*)</li>
+                    </ul>
+                    <div class="password-strength" id="strengthBar" style="display: none;">
+                        <div class="password-strength-bar" id="strengthFill"></div>
+                    </div>
+                </div>
+
+                <form action="/signup" method="post" onsubmit="return validateForm()">
 
                     <label for="email">DLSU E-mail Address:</label><br><br>
                     <input type="email" id="email" name="email" required><br><br>
@@ -28,7 +116,21 @@
                     <input type="password" id="password" name="password" required><br><br>
                     
                     <label for="password">Re-enter Password:</label><br><br>
-                    <input type="password" id="confirmpassword" name="confirmpassword" required><br><br><br>
+                    <input type="password" id="confirmpassword" name="confirmpassword" required><br><br>
+
+                    <label for="securityQuestion">Security Question (for password recovery):</label><br><br>
+                    <select id="securityQuestion" name="securityQuestion" required>
+                        <option value="">-- Select a Question --</option>
+                        <option value="What is your favorite color?">What is your favorite color?</option>
+                        <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                        <option value="What city were you born in?">What city were you born in?</option>
+                        <option value="What is your favorite food?">What is your favorite food?</option>
+                        <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                        <option value="What is your favorite book?">What is your favorite book?</option>
+                    </select><br><br>
+
+                    <label for="securityAnswer">Answer:</label><br><br>
+                    <input type="text" id="securityAnswer" name="securityAnswer" required><br><br><br>
 
                     <input type="submit" value="Create Account"><br>
                 </form>
@@ -36,17 +138,107 @@
         </div>
         
         <script>
-            function matchPassword() {
-                var password = document.getElementById("password").value;
-                var confirmpassword = document.getElementById("confirmpassword").value;
-    
-                // Check if password and confirmpassword match
-                if (password === confirmpassword) {
-                    return true; // Proceed with account creation
+            const passwordInput = document.getElementById("password");
+            const confirmPasswordInput = document.getElementById("confirmpassword");
+
+            // Real-time password validation
+            passwordInput.addEventListener('input', function() {
+                validatePasswordStrength(this.value);
+            });
+
+            function validatePasswordStrength(password) {
+                const lengthReq = document.getElementById('req-length');
+                const uppercaseReq = document.getElementById('req-uppercase');
+                const numberReq = document.getElementById('req-number');
+                const specialReq = document.getElementById('req-special');
+                const strengthBar = document.getElementById('strengthBar');
+                const strengthFill = document.getElementById('strengthFill');
+
+                // Check requirements
+                const hasLength = password.length >= 8;
+                const hasUppercase = /[A-Z]/.test(password);
+                const hasNumber = /[0-9]/.test(password);
+                const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+
+                // Update requirement indicators
+                updateRequirement(lengthReq, hasLength);
+                updateRequirement(uppercaseReq, hasUppercase);
+                updateRequirement(numberReq, hasNumber);
+                updateRequirement(specialReq, hasSpecial);
+
+                // Calculate strength
+                const metRequirements = [hasLength, hasUppercase, hasNumber, hasSpecial].filter(Boolean).length;
+                
+                if (password.length > 0) {
+                    strengthBar.style.display = 'block';
+                    
+                    strengthFill.className = 'password-strength-bar';
+                    if (metRequirements <= 2) {
+                        strengthFill.classList.add('strength-weak');
+                    } else if (metRequirements === 3) {
+                        strengthFill.classList.add('strength-medium');
+                    } else {
+                        strengthFill.classList.add('strength-strong');
+                    }
                 } else {
-                    alert("Passwords do not match. Please try again.");
-                    return false; // Prevent account creation
+                    strengthBar.style.display = 'none';
                 }
+            }
+
+            function updateRequirement(element, met) {
+                if (met) {
+                    element.className = 'requirement-met';
+                    element.innerHTML = element.innerHTML.replace('✗', '✓');
+                } else {
+                    element.className = 'requirement-unmet';
+                    element.innerHTML = element.innerHTML.replace('✓', '✗');
+                }
+            }
+
+            function validateForm() {
+                const password = passwordInput.value;
+                const confirmPassword = confirmPasswordInput.value;
+
+                // Check if passwords match
+                if (password !== confirmPassword) {
+                    alert("Passwords do not match. Please try again.");
+                    return false;
+                }
+
+                // Validate password requirements
+                const hasLength = password.length >= 8;
+                const hasUppercase = /[A-Z]/.test(password);
+                const hasNumber = /[0-9]/.test(password);
+                const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+
+                if (!hasLength) {
+                    alert("Password must be at least 8 characters long.");
+                    return false;
+                }
+
+                if (!hasUppercase) {
+                    alert("Password must contain at least one uppercase letter.");
+                    return false;
+                }
+
+                if (!hasNumber) {
+                    alert("Password must contain at least one number.");
+                    return false;
+                }
+
+                if (!hasSpecial) {
+                    alert("Password must contain at least one special character (!@#$%^&*()_+-=[]{};':\"\\|,.<>/?)");
+                    return false;
+                }
+
+                // Validate security answer
+                const securityAnswer = document.getElementById("securityAnswer").value.trim();
+                if (securityAnswer.length < 2) {
+                    alert("Please provide a valid answer to the security question.");
+                    return false;
+                }
+
+                return true; // Proceed with account creation
             }
         </script>
 
