@@ -62,7 +62,9 @@
                 <select id="editRole">
                     <option value="member">member</option>
                     <option value="moderator">moderator</option>
-                    <option value="admin">admin</option>
+                    <% if (currentUser && currentUser.role === "admin") { %>
+                        <option value="admin">admin</option>
+                    <% } %>
                 </select><br><br>
                 <label>Email:</label><br>
                 <input type="text" id="editEmail"><br><br>
@@ -78,5 +80,7 @@
         <!-- Overlay -->
         <div id="modalOverlay"></div>
     </body>
-
+    <script>
+        const currentUser = <%- JSON.stringify(currentUser) %>;
+    </script>
 </html>

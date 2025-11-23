@@ -18,6 +18,10 @@ $(document).ready(function () {
         `;
 
         users.forEach(user => {
+            let showButtons = true;
+            if (String(currentUser.dlsuRole) === "moderator" && (user.dlsuRole === "admin" || user.dlsuRole === "moderator")) {
+                showButtons = false;
+            }
             table += `
                 <tr data-user='${JSON.stringify(user)}'>
                     <td class="tableRow">${user.username}</td>
@@ -25,8 +29,8 @@ $(document).ready(function () {
                     <td class="tableRow">${user.dlsuID}</td>
                     <td class="tableRow">${user.dlsuRole}</td>
                     <td class="tableRow" style="display: flex; gap: 5px;">
-                        <button class="editBtn" style="padding: 4px 8px;">Edit</button>
-                        <button class="deleteBtn" style="padding: 4px 8px; background-color: #e74c3c; color: white;">Delete</button>
+                        <button class="editBtn ${!showButtons ? 'hidden' : ''}" style="padding: 4px 8px;">Edit</button>
+                        <button class="deleteBtn ${!showButtons ? 'hidden' : ''}" style="padding: 4px 8px; background-color: #e74c3c; color: white;">Delete</button>
                     </td>
                 </tr>
             `;

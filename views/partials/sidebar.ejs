@@ -10,7 +10,7 @@
             
         
         <!-- Admin and Moderator only: User List-->
-        <% if (currentUser && currentUser.dlsuRole === "admin") { %>
+        <% if (currentUser && currentUser.dlsuRole === "admin" || currentUser.dlsuRole === "moderator") { %>
             <a href="/userList"><div id="sideButton" class="highlight" style="top:320px;"><p>USER LIST</p></div></a>
         <% } %>
         
