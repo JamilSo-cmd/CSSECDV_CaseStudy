@@ -500,7 +500,6 @@ app.get('/logout', (req, res) => {
       return res.status(500).json({ message: "Internal server error." });
     }
     logEvent('info', `User logged out: ${username}`, userId);
-    req.session.userInfo = null;
     res.clearCookie('SessionCookie');
     res.redirect('/login');
   });
