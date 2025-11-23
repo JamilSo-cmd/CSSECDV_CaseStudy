@@ -29,8 +29,6 @@ app.use(session(
     cookie: { secure: false, maxAge: 7 * 24 * 3600 * 1000 }
   }));
 
-var curUser; // should be a user
-
 app.use(express.urlencoded({ extended: true })); // Add this line for form data
 app.use(express.json()); // Add this for JSON parsing
 
@@ -310,6 +308,167 @@ app.get('/updateLikes', async (req, res) => {
 
 });
 
+app.get('/trending',async (req,res)=> {
+
+  const postCollection = client.db("ForumsDB").collection("Posts");
+  
+  // Execute query 
+  const cursor = postCollection.find().sort({likes:-1});
+  
+  // Print a message if no documents were found
+  if ((postCollection.countDocuments()) === 0) {
+    console.log("No documents found!");
+  }
+
+  const array =  await cursor.toArray();
+
+  res.status(200).json(array);
+  
+
+});
+
+// gets a single post (WIP)
+app.get('/onePost', async (req,res) =>{
+
+  try{
+    const postCollection = client.db("ForumsDB").collection("Posts");
+    var postID = req.header('postID');
+    var postObjID = new ObjectId(postID);
+
+    console.log('Received post ID: ' + postID);
+
+    // Execute query 
+    var postToSend = await postCollection.findOne({ _id: postObjID });
+
+    console.log('post found to send has the subject of: ' + postToSend.subject);
+    
+    const postData = [{
+      '_id': postToSend._id, 
+      'subject': postToSend.subject,
+      'message': postToSend.message,
+      'tag': postToSend.tag,
+      'date': postToSend.date,
+      'dislikes': postToSend.dislikes,
+      'likes': postToSend.likes,
+      'authorID': postToSend.authorID
+    }];
+
+    // sends post back
+    if(postData) {
+      console.log("post sent");
+      res.json(postData);
+    }
+    else {
+      console.error('Error finding post to send back', error);
+      return res.status(404).json({ message: "Post not found." });
+    }
+
+  } catch (error) {
+    console.log("Error locating single post", error);
+  }
+
+});
+
+// gets a single comment
+app.get('/oneComment', async (req,res) =>{
+
+  try{
+    const commCollection = client.db("ForumsDB").collection("Comments");
+    var commID = req.header('commID');
+    var commObjID = new ObjectId(commID);
+
+    console.log('Received comment ID: ' + commID);
+
+    // Execute query 
+    var commToSend = await commCollection.findOne({ _id: commObjID });
+
+    console.log('comment found to send has the subject of: ' + commToSend.comment);
+    
+    const commData = [{
+      '_id': commToSend._id,
+      'comment': commToSend.comment,
+      'date': commToSend.date,
+      'authorID': commToSend.authorID
+    }];
+
+    // sends comment back
+    if(commData) {
+      console.log("comment sent");
+      res.json(commData);
+    }
+    else {
+      console.error('Error finding comment to send back', error);
+      return res.status(404).json({ message: "Comment not found." });
+    }
+
+  } catch (error) {
+    console.log("Error locating single comment", error);
+  }
+
+});
+
+app.get('/categories',async (req,res)=>{
+
+  const postCollection = client.db("ForumsDB").collection("Posts");
+
+  // Execute query 
+  const cursor = await postCollection.distinct("tag");
+
+  // Print a message if no documents were found
+  if ((postCollection.countDocuments()) === 0) {
+    console.log("No documents found!");
+  }
+  
+  res.status(200).json(cursor);
+  
+});
+
+app.get('/filter', async (req, res) => {
+
+  const postCollection = client.db("ForumsDB").collection("Posts");
+  const searchStr = req.query.search;
+  const sortStr = req.query.sort;
+  const categoryStr = req.query.category;
+
+  console.log("looking for: "+searchStr)
+  console.log("sorted  by:  "+sortStr)
+  console.log("with category: "+categoryStr)
+  console.log("----------------------------")
+
+  const query = {
+    subject:{$regex:searchStr},
+    tag:{$regex:categoryStr}
+  }
+
+  //sort by newest
+  let sort = {};
+
+  if (sortStr == "Alphabetical"){
+
+    sort = {subject:-1}
+
+  }
+  else if (sortStr == "Oldest"){
+
+    sort = {_id:-1}
+
+  }
+
+
+  // Execute query 
+  const cursor = postCollection.find(query).collation({'locale':'en'}).sort(sort);
+
+  // Print a message if no documents were found
+  if ((postCollection.countDocuments()) === 0) {
+    console.log("No documents found!");
+  }
+
+  const array =  await cursor.toArray();
+
+  
+  res.status(200).json(array);
+})
+
 app.get('/logout', (req, res) => {
   // Destroy the session
   req.session.destroy((err) => {
@@ -317,68 +476,71 @@ app.get('/logout', (req, res) => {
           console.error("Error destroying session:", err);
           return res.status(500).json({ message: "Internal server error." });
       }
-      curUser = null; // Clear the global variable
+      req.session.userInfo = null;
       res.clearCookie('SessionCookie'); // Clear the session cookie
       res.redirect('/login');
   });
 });
 
-app.get('/profile-edit', (req, res) =>{
-  res.render("profile-edit")
-});
-
-app.post('/profile-edit', async (req,res) => {
-
-  let userID = req.session.userInfo._id;
-
+// Handle editing profile and validation that username is unique (WIP)
+app.post('/editProfile', async (req, res) => {
   try {
+    console.log("edit Profile function started");
+    const { usernameInput, profilePicInput, genderInput, dlsuIDInput, roleInput, descInput } = req.body;
+    const usersCollection = client.db("ForumsDB").collection("Users");
+    const sessionUser = req.session.userInfo;
+    const user = await usersCollection.findOne({ username: sessionUser.username });
 
-      const usersCollection = client.db("ForumsDB").collection("Users");
+    if (!user) {
+      console.error("User editing error: User not found");
+      return res.status(404).json({ message: "User not found." });
+    } else {
+      if (usernameInput) {
+        // Check if the new username already exists in the database
+        const existingUser = await usersCollection.findOne({ username: usernameInput });
+        if (existingUser && existingUser.username !== sessionUser.username) {
+          console.error("User editing error: Username already exists");
+          return res.status(400).json({ message: "Username already exists." });
+        }
+      }
 
-      const {username,description,dlsuRole,dlsuID,gender,profilePic} = req.body;
-
-      const filter = {_id: new ObjectId(userID)};
+      const filter = { username: sessionUser.username };
       const updates = {};
 
-      if (username) {
-        updates.username = username;
+      if (usernameInput) {
+        updates.username = usernameInput;
       }
-      if (description) {
-        updates.description = description;
+      if (profilePicInput) {
+        updates.profilePic = profilePicInput;
       }
-      if (dlsuRole) {
-        updates.dlsuRole = dlsuRole;
+      if (genderInput) {
+        updates.gender = genderInput;
       }
-      if (dlsuID) {
-        updates.dlsuID = dlsuID;
+      if (dlsuIDInput) {
+        updates.dlsuID = dlsuIDInput;
       }
-      if (gender) {
-        updates.gender = gender;
+      if (roleInput) {
+        updates.dlsuRole = roleInput;
       }
-      if (profilePic) {
-        updates.profilePic = profilePic;
+      if (descInput) {
+        updates.description = descInput;
       }
 
       // Update the user document with the accumulated updates
-      const result = await usersCollection.updateOne(filter, { $set: updates });
+      await usersCollection.updateOne(filter, { $set: updates });
 
-      if (result.modifiedCount === 1) {
-        console.log("User edited successfully");
+      // Update current user with the new profile information
+      Object.assign(req.session.userInfo, updates);
 
-        const result2 = await usersCollection.findOne(filter);
-        console.log(result2);
-        req.session.userInfo = result2;
-
-        return res.redirect('/profile');
-      } else {
-        return res.status(404).json({ message: "User not found or could not be updated." });
-      }
-
+      console.log("User profile updated successfully");
+      return res.redirect('/profile');
+      
+      
+    }
   } catch (error) {
-      console.error("Error occurred during user edit:", error);
-      return res.status(500).json({ message: "Internal server error." });
+    console.error("Error occurred during editing of profile info", error);
+    return res.status(500).json({ message: "Internal server error." });
   }
-
 });
 
 app.get('/userPosts', async (req,res) =>{
@@ -488,7 +650,6 @@ app.post('/login', async (req, res) => {
 
     // Set session and redirect
     req.session.userInfo = user;
-    curUser = user;
     console.log("User logged in successfully");
     return res.redirect('/index');
 
@@ -719,8 +880,7 @@ app.post('/create', async (req,res) => {
   
   try{
 
-    let userID = req.session.userInfo;
-    console.log(req.session.userInfo);
+    let sessionUser = req.session.userInfo;
 
     const {subject,message,tag} = req.body;
 
@@ -733,15 +893,15 @@ app.post('/create', async (req,res) => {
     const postsCollection = client.db("ForumsDB").collection("Posts");
 
     const result = await postsCollection.insertOne({
-      author:userID.username,
-      authorPic:curUser.profilePic,
+      author:sessionUser.username,
+      authorPic:sessionUser.profilePic,
       subject:subject,
       message:message,
       tag:tag,
       date:date,
       dislikes: 0,
       likes: 0,
-      authorID:curUser._id.toString(),
+      authorID:sessionUser._id.toString(),
     });
 
     console.log("test");
