@@ -610,3 +610,14 @@ h1 {
     font-style: italic;
 
 }
+
+.userTable{
+    width: 100%; 
+    border-collapse: collapse;
+    flex-shrink: 0;
+}
+
+.tableRow{
+    border: 1px solid #ccc;
+    padding: 8px;
+}

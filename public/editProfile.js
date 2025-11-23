@@ -27,7 +27,6 @@ $(document).ready(function () {
                 document.getElementById('profilePicInput').value = user.profilePic;
                 document.getElementById('genderInput').value = user.gender;
                 document.getElementById('dlsuIDInput').value = user.dlsuID;
-                document.getElementById('roleInput').value = user.dlsuRole;
                 document.getElementById('descInput').value = user.description;
                 console.log("Retreived relevant user data");
             } else {
