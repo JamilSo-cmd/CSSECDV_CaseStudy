@@ -766,13 +766,21 @@ app.post('/forgot-password', async (req, res) => {
         }
       }
 
-      // Hash new password and update
+      // Hash new password
       const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Add current password to history before updating
+      const updatedHistory = [...passwordHistory, user.password];
+      // Keep only the last 5 passwords in history
+      const trimmedHistory = updatedHistory.slice(-5);
+
+      // Update with new password and history
       await usersCollection.updateOne(
         { email: email },
         { 
           $set: { 
             password: hashedPassword,
+            passwordHistory: trimmedHistory,
             failedLoginAttempts: 0
           },
           $unset: { lockUntil: "" }
@@ -1039,7 +1047,7 @@ app.post('/signup', async (req, res) => {
           securityQuestion: securityQuestion || "What is your favorite color?",
           securityAnswer: securityAnswer || "",
           failedLoginAttempts: 0,
-          passwordHistory: []
+          passwordHistory: []  // Initialize empty password history
       });
 
       // If insertion is successful, respond with a success message
