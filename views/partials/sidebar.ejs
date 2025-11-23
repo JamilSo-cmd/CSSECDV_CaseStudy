@@ -8,6 +8,8 @@
 
         <a href="/editProfile"><div id="sideButton" class="highlight" style="top:240px;"><p>EDIT PROFILE</p></div></a>
             
+        
+        <!-- Admin and Moderator only: User List-->
         <% if (currentUser && currentUser.dlsuRole === "admin") { %>
             <a href="/userList"><div id="sideButton" class="highlight" style="top:320px;"><p>USER LIST</p></div></a>
         <% } %>

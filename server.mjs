@@ -494,13 +494,15 @@ app.get('/logout', (req, res) => {
   const username = req.session.userInfo?.username;
 
   req.session.destroy((err) => {
-      if (err) {
-          console.error("Error destroying session:", err);
-          return res.status(500).json({ message: "Internal server error." });
-      }
-      req.session.userInfo = null;
-      res.clearCookie('SessionCookie'); // Clear the session cookie
-      res.redirect('/login');
+
+    if (err) {
+      logEvent('error', `Error destroying session: ${err.message}`, userId);
+      return res.status(500).json({ message: "Internal server error." });
+    }
+    logEvent('info', `User logged out: ${username}`, userId);
+    req.session.userInfo = null;
+    res.clearCookie('SessionCookie');
+    res.redirect('/login');
   });
 });
 
@@ -554,7 +556,7 @@ app.post('/editProfile', async (req, res) => {
       // Update current user with the new profile information
       Object.assign(req.session.userInfo, updates);
 
-      console.log("User profile updated successfully");
+      logEvent('info', `Profile updated for user ${username || req.session.userInfo.username}`, userID.toString());
       return res.redirect('/profile');
     }
   } catch (error) {
@@ -701,10 +703,8 @@ app.post('/login', async (req, res) => {
     );
 
     req.session.userInfo = user;
-    console.log("User logged in successfully");
-    curUser = user;
 
-    logEvent(req, 'info', `User logged in successfully: ${user.username}`, user._id.toString());
+    logEvent('info', `User logged in successfully: ${user.username}`, user._id.toString(), userIP);
     return res.redirect('/index');
 
   } catch (error) {
@@ -852,20 +852,21 @@ app.get('/create', (req, res) => {
   res.render("create");
 });
 
-// POST create post
-app.post('/create', async (req, res) => {
-  try {
-    const userID = req.session.userInfo;
+// registers posts into the db
+app.post('/create', async (req,res) => {
+  
+  try{
 
-    if (!userID) {
-      logEvent(req, 'warn', 'Unauthorized post creation attempt');
+    let sessionUser = req.session.userInfo;
+        
+    if (!sessionUser) {
+      logEvent('warn', 'Unauthorized post creation attempt');
       return res.redirect('/login');
     }
+    const {subject,message,tag} = req.body;
 
-    const { subject, message, tag } = req.body;
-
-    if (!subject || !message || !tag) {
-      logEvent(req, 'warn', `Incomplete post data from user: ${userID.username}`, userID._id.toString());
+    if (!subject || !message || !tag){
+      logEvent('warn', `Incomplete post data from user: ${userID.username}`, userID._id.toString());
       return res.redirect('/create');
     }
 
@@ -873,15 +874,15 @@ app.post('/create', async (req, res) => {
     const postsCollection = client.db("ForumsDB").collection("Posts");
 
     const result = await postsCollection.insertOne({
-      author: userID.username,
-      authorPic: userID.profilePic || "",
-      subject: subject,
-      message: message,
-      tag: tag,
-      date: date,
+      author:sessionUser.username,
+      authorPic:sessionUser.profilePic,
+      subject:subject,
+      message:message,
+      tag:tag,
+      date:date,
       dislikes: 0,
       likes: 0,
-      authorID: userID._id.toString(),
+      authorID:sessionUser._id.toString(),
     });
 
     logEvent(req, 'info', `Post created: "${subject}" by ${userID.username}`, userID._id.toString());
