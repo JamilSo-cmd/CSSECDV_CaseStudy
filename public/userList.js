@@ -43,9 +43,53 @@ $(document).ready(function () {
 
         // Attach click handlers for dynamic rows
         $(".postBody").on("click", ".editBtn", function () {
-            const userId = $(this).closest("tr").data("id");
-            alert(`Edit User with ID: ${userId}`);
-            // TODO: Open edit modal or redirect to edit page
+            const row = $(this).closest("tr");
+            const userId = row.data("id");
+            const username = row.find("td:nth-child(1)").text();
+            const gender = row.find("td:nth-child(2)").text();
+            const role = row.find("td:nth-child(4)").text();
+
+            $("#editUserId").val(userId);
+            $("#editUsername").val(username);
+            $("#editGender").val(gender);
+            $("#editRole").val(role);
+
+            $("#editModal, #modalOverlay").show();
+        });
+
+        // Close modal
+        $("#closeModal, #modalOverlay").on("click", function () {
+            $("#editModal, #modalOverlay").hide();
+        });
+        
+        // Handle form submission
+        $("#editUserForm").on("submit", function (e) {
+            e.preventDefault();
+
+            const userId = $("#editUserId").val();
+            const updatedUser = {
+                username: $("#editUsername").val(),
+                gender: $("#editGender").val(),
+                dlsuRole: $("#editRole").val()
+            };
+
+            $.ajax({
+                url: `/updateUser/${userId}`,
+                method: "POST",
+                data: updatedUser,
+                success: function (res) {
+                    alert("User updated!");
+                    $("#editModal, #modalOverlay").hide();
+
+                    const row = $(`tr[data-id='${userId}']`);
+                    row.find("td:nth-child(1)").text(updatedUser.username);
+                    row.find("td:nth-child(2)").text(updatedUser.gender);
+                    row.find("td:nth-child(4)").text(updatedUser.dlsuRole);
+                },
+                error: function (err) {
+                    alert("Failed to update user.");
+                }
+            });
         });
 
         $(".postBody").on("click", ".deleteBtn", function () {

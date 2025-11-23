@@ -39,8 +39,36 @@
                 </td>
 
             </tr>
-        </table>    
-                
+        </table>
+
+        <div id="editModal">
+            <h3>Edit User</h3>
+            <form id="editUserForm">
+                <input type="hidden" id="editUserId">
+                <label>Username:</label><br>
+                <input type="text" id="editUsername"><br><br>
+
+                <label>Gender:</label><br>
+                <select id="editGender">
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="">Other</option>
+                </select><br><br>
+
+                <label>Role:</label><br>
+                <select id="editRole">
+                    <option value="member">member</option>
+                    <option value="moderator">moderator</option>
+                    <option value="admin">admin</option>
+                </select><br><br>
+
+                <button type="submit">Save</button>
+                <button type="button" id="closeModal">Cancel</button>
+            </form>
+        </div>
+
+        <!-- Overlay -->
+        <div id="modalOverlay"></div>
     </body>
 
 </html>
