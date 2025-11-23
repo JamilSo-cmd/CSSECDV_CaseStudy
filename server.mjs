@@ -838,7 +838,13 @@ app.post('/viewpost', (req, res) =>{
 
 });
 
-app.get('/about', (req, res) =>{
+app.get('/userPosts', (req, res) =>{
+
+  res.render("userPosts");
+
+});
+
+app.get('/userList', (req, res) =>{
 
   res.render("about");
 
