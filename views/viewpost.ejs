@@ -128,6 +128,9 @@
         </table>    
         
         <script>
+            
+            const currentUser = <%- JSON.stringify(currentUser) %>;
+        
             // for when user clicks like or dislike
             async function likeThis(likePostID, likeValue) {
                 if(likeValue == 1)
