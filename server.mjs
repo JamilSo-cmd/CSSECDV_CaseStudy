@@ -1080,6 +1080,9 @@ app.post('/updateUser/:userId', async (req, res) => {
 
     const usersCollection = client.db("ForumsDB").collection("Users");
 
+    // Get the user before update for logging
+    const userBeforeUpdate = await usersCollection.findOne({ _id: new ObjectId(userId) });
+    
     const updateResult = await usersCollection.updateOne(
         { _id: new ObjectId(userId) },
         {
@@ -1096,12 +1099,30 @@ app.post('/updateUser/:userId', async (req, res) => {
     );
 
     if (updateResult.modifiedCount === 1) {
+        // Log the user update
+        logEvent(req, 'info', 
+            `User updated: ${userBeforeUpdate?.username || userId} (ID: ${userId}). ` +
+            `Updated fields: username=${username !== userBeforeUpdate?.username}, ` +
+            `gender=${gender !== userBeforeUpdate?.gender}, ` +
+            `role=${dlsuRole !== userBeforeUpdate?.dlsuRole}, ` +
+            `email=${email !== userBeforeUpdate?.email}`,
+            req.session.userInfo?._id?.toString()
+        );
+        
         res.json({ message: "User updated successfully." });
     } else {
+        logEvent(req, 'warn', 
+            `User update failed - no changes made for user: ${userBeforeUpdate?.username || userId} (ID: ${userId})`,
+            req.session.userInfo?._id?.toString()
+        );
         res.status(404).json({ error: "User not found or no changes made." });
     }
 
   } catch (err) {
+    logEvent(req, 'error', 
+        `Error updating user ${req.params.userId}: ${err.message}`,
+        req.session.userInfo?._id?.toString()
+    );
     console.error("Error updating user:", err);
     res.status(500).json({ error: "Internal server error." });
   }
@@ -1112,14 +1133,30 @@ app.delete('/deleteUser/:userId', async (req, res) => {
         const userId = req.params.userId;
         const usersCollection = client.db("ForumsDB").collection("Users");
 
+        // Get user info before deletion for logging
+        const userToDelete = await usersCollection.findOne({ _id: new ObjectId(userId) });
+
         const deleteResult = await usersCollection.deleteOne({ _id: new ObjectId(userId) });
 
         if (deleteResult.deletedCount === 1) {
+            // Log the user deletion
+            logEvent(req, 'info', 
+                `User deleted: ${userToDelete?.username || 'Unknown'} (ID: ${userId}) by admin ${req.session.userInfo?.username}`,
+                req.session.userInfo?._id?.toString()
+            );
             res.json({ message: "User deleted successfully." });
         } else {
+            logEvent(req, 'warn', 
+                `User deletion failed - user not found: ${userId}`,
+                req.session.userInfo?._id?.toString()
+            );
             res.status(404).json({ error: "User not found." });
         }
     } catch (err) {
+        logEvent(req, 'error', 
+            `Error deleting user ${req.params.userId}: ${err.message}`,
+            req.session.userInfo?._id?.toString()
+        );
         console.error("Error deleting user:", err);
         res.status(500).json({ error: "Internal server error." });
     }
