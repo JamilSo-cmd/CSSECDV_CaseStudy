@@ -6,6 +6,29 @@
     width: 100%;
 }
 
+.lastLoginPopup {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 1000;
+    text-align: center;
+}
+
+.popupOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    z-index: 900;
+}
+
 .post{
     width: 900px;
     height:auto;
@@ -428,6 +451,23 @@ h1 {
   color: rgba(255, 255, 255, 1);
   box-shadow: 0 5px 15px rgba(70, 185, 147, 0.4);
 }
+
+.resetPasswordButton {
+    border: 2px outset #91c092;
+    height: 25px;
+    width: 120px;
+    background-color: #a5d2a6;
+    box-shadow: 0 1px #666;
+    cursor: pointer;
+    display: block;
+    margin-top: 10px;
+}
+
+.resetPasswordButton:hover {
+    color: rgba(255, 255, 255, 1);
+    box-shadow: 0 5px 15px rgba(70, 185, 147, 0.4);
+}
+
 
 .likeButton{
     position:relative;
