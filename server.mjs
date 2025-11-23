@@ -88,6 +88,17 @@ app.set("views", "views");
 
 app.use('/', express.static('public', {index: "index"}))
 
+// Make user data available in all templates - CORRECTED VERSION
+app.use((req, res, next) => {
+  // Check if user is logged in and session exists
+  if (req.session && req.session.userInfo) {
+    res.locals.user = req.session.userInfo;
+  } else {
+    res.locals.user = null;
+  }
+  next();
+});
+
 app.get('/index', (req, res) =>{
   logEvent('info', 'Index page accessed', req.session.userInfo?._id?.toString());
   res.render("index")
@@ -987,13 +998,3 @@ app.get('/logs', async (req, res) => {
   }
 });
 
-// Make user data available in all templates - CORRECTED VERSION
-app.use((req, res, next) => {
-  // Check if user is logged in and session exists
-  if (req.session && req.session.userInfo) {
-    res.locals.user = req.session.userInfo;
-  } else {
-    res.locals.user = null;
-  }
-  next();
-});
