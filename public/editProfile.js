@@ -1,7 +1,6 @@
 $(document).ready(function () {
     
-    const userID = new URLSearchParams(window.location.search).get('userID');
-    console.log(userID);
+    const userID = currentUser._id;
     
     fetch('/userData',{// gets user Data from backend
         headers: {

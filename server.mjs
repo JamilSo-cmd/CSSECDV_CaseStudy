@@ -585,7 +585,11 @@ app.post('/editProfile', async (req, res) => {
       // Update current user with the new profile information
       Object.assign(req.session.userInfo, updates);
 
-      logEvent('info', `Profile updated for user ${username || req.session.userInfo.username}`, userID.toString());
+      logEvent(
+        'info',
+        `Profile updated for user ${updates.username || req.session.userInfo.username}`,
+        user._id.toString()
+      );
       return res.redirect('/profile');
     }
   } catch (error) {
