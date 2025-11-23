@@ -739,6 +739,33 @@ app.post('/forgot-password', async (req, res) => {
         });
       }
 
+      // Check password history - prevent reusing last 5 passwords
+      const passwordHistory = user.passwordHistory || [];
+      
+      // Check current password
+      const isCurrentPassword = await bcrypt.compare(newPassword, user.password);
+      if (isCurrentPassword) {
+        return res.render("forgot-password", { 
+          step: 2,
+          email: email,
+          securityQuestion: user.securityQuestion,
+          error: "Cannot reuse your current password. Please choose a different password." 
+        });
+      }
+
+      // Check against password history (last 5 passwords)
+      for (let oldHash of passwordHistory) {
+        const isOldPassword = await bcrypt.compare(newPassword, oldHash);
+        if (isOldPassword) {
+          return res.render("forgot-password", { 
+            step: 2,
+            email: email,
+            securityQuestion: user.securityQuestion,
+            error: "Cannot reuse any of your last 5 passwords. Please choose a different password." 
+          });
+        }
+      }
+
       // Hash new password and update
       const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
       await usersCollection.updateOne(
@@ -1011,7 +1038,8 @@ app.post('/signup', async (req, res) => {
           gender: "",
           securityQuestion: securityQuestion || "What is your favorite color?",
           securityAnswer: securityAnswer || "",
-          failedLoginAttempts: 0
+          failedLoginAttempts: 0,
+          passwordHistory: []
       });
 
       // If insertion is successful, respond with a success message
