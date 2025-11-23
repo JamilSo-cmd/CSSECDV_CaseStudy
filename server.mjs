@@ -754,13 +754,48 @@ app.post('/forgot-password', async (req, res) => {
         });
       }
 
-      // Hash new password and update
+      // Check password history - prevent reusing last 5 passwords
+      const passwordHistory = user.passwordHistory || [];
+      
+      // Check current password
+      const isCurrentPassword = await bcrypt.compare(newPassword, user.password);
+      if (isCurrentPassword) {
+        return res.render("forgot-password", { 
+          step: 2,
+          email: email,
+          securityQuestion: user.securityQuestion,
+          error: "Cannot reuse your current password. Please choose a different password." 
+        });
+      }
+
+      // Check against password history (last 5 passwords)
+      for (let oldHash of passwordHistory) {
+        const isOldPassword = await bcrypt.compare(newPassword, oldHash);
+        if (isOldPassword) {
+          return res.render("forgot-password", { 
+            step: 2,
+            email: email,
+            securityQuestion: user.securityQuestion,
+            error: "Cannot reuse any of your last 5 passwords. Please choose a different password." 
+          });
+        }
+      }
+
+      // Hash new password
       const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Add current password to history before updating
+      const updatedHistory = [...passwordHistory, user.password];
+      // Keep only the last 5 passwords in history
+      const trimmedHistory = updatedHistory.slice(-5);
+
+      // Update with new password and history
       await usersCollection.updateOne(
         { email: email },
         { 
           $set: { 
             password: hashedPassword,
+            passwordHistory: trimmedHistory,
             failedLoginAttempts: 0
           },
           $unset: { lockUntil: "" }
@@ -956,11 +991,81 @@ app.get('/signup', (req, res) =>{
 // Handle registering users to the DB with enhanced validation
 app.post('/signup', async (req, res) => {
   try {
-    const { email, username, password, confirmpassword, securityQuestion, securityAnswer } = req.body;
-    const userIP = req.ip || req.connection.remoteAddress;
-    
-    if (!email || !username || !password || !confirmpassword) {
-      logEvent('warn', 'Signup attempt with missing fields', null, userIP);
+      const { email, username, password, confirmpassword, securityQuestion, securityAnswer } = req.body;
+      
+      // Make sure all required fields are provided
+      if (!email || !username || !password || !confirmpassword) {
+          return res.render("signup", { 
+            error: "All fields are required." 
+          });
+      }
+
+      // Check if passwords match
+      if (password !== confirmpassword) {
+          return res.render("signup", { 
+            error: "Passwords do not match." 
+          });
+      }
+
+      // Validate password strength
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+          return res.render("signup", { 
+            error: passwordValidation.message 
+          });
+      }
+
+      const usersCollection = client.db("ForumsDB").collection("Users");
+
+      // Check if username already exists (case-insensitive)
+      const existingUsername = await usersCollection.findOne({ 
+        username: { $regex: new RegExp(`^${username}$`, 'i') } 
+      });
+      
+      if (existingUsername) {
+          return res.render("signup", { 
+            error: "Username already exists. Please choose a different username." 
+          });
+      }
+
+      // Check if email already exists
+      const existingEmail = await usersCollection.findOne({ email: email });
+      
+      if (existingEmail) {
+          return res.render("signup", { 
+            error: "Email address already registered. Please use a different email." 
+          });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+      // Insert the user data into the database
+      const result = await usersCollection.insertOne({
+          email: email,
+          username: username,
+          password: hashedPassword,
+          profilePic: "https://news.tulane.edu/sites/default/files/headshot_icon_0.jpg",
+          description: "",
+          dlsuID: "",
+          dlsuRole:  "member",
+          gender: "",
+          securityQuestion: securityQuestion || "What is your favorite color?",
+          securityAnswer: securityAnswer || "",
+          failedLoginAttempts: 0,
+          passwordHistory: []  // Initialize empty password history
+      });
+
+      // If insertion is successful, respond with a success message
+      if (result.insertedId) {
+          return res.redirect('/login');
+      } else {
+          return res.render("signup", { 
+            error: "Failed to create account. Please try again." 
+          });
+      }
+  } catch (error) {
+      console.error("Error occurred during signup:", error);
       return res.render("signup", { 
         error: "All fields are required." 
       });
