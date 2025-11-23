@@ -122,8 +122,12 @@ app.get('/', (req, res) =>{
 // global variable used in original file
 var curUser = null;
 
-// Root / index route
+// index route
 app.get('/index', async (req, res) => {
+  if (!req.session.userInfo) {
+    logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
+    return res.redirect('/login');
+  }
   const user = req.session.userInfo;
   let lastLoginPopup = null;
 
@@ -874,11 +878,19 @@ app.get('/userData', async (req, res) => {
 
 // Profile view & create post routes
 app.get('/profile', (req, res) => {
+  if (!req.session.userInfo) {
+    logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
+    return res.redirect('/login');
+  }
   logEvent(req, 'info', 'Profile page accessed', req.session.userInfo?._id?.toString());
   res.render("profile");
 });
 
 app.get('/create', (req, res) => {
+  if (!req.session.userInfo) {
+    logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
+    return res.redirect('/login');
+  }
   logEvent(req, 'info', 'Create post page accessed', req.session.userInfo?._id?.toString());
   res.render("create");
 });
@@ -1167,11 +1179,19 @@ app.delete('/deleteUser/:userId', async (req, res) => {
 });
 
 app.get('/editProfile', (req, res) => {
+  if (!req.session.userInfo) {
+    logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
+    return res.redirect('/login');
+  }
   logEvent(req, 'info', 'Edit profile page accessed', req.session.userInfo?._id?.toString());
   res.render("editProfile");
 });
 
 app.get('/viewpost', (req, res) => {
+  if (!req.session.userInfo) {
+    logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
+    return res.redirect('/login');
+  }
   logEvent(req, 'info', 'View post page accessed', req.session.userInfo?._id?.toString());
   res.render("viewpost");
 });
@@ -1182,6 +1202,10 @@ app.post('/viewpost', (req, res) => {
 });
 
 app.get('/userList', (req, res) => {
+  if (!req.session.userInfo) {
+    logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
+    return res.redirect('/login');
+  }
   logEvent(req, 'info', 'User list page accessed', req.session.userInfo?._id?.toString());
   res.render("userList");
 });
