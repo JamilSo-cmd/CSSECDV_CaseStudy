@@ -1,18 +1,19 @@
 import express from 'express';
 import path from 'path';
-import { MongoClient, ServerApiVersion } from 'mongodb';
-import { ObjectId } from 'mongodb';
+import { MongoClient, ServerApiVersion, ObjectId } from 'mongodb';
 import session from 'express-session';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import { v4 as uuidv4 } from 'uuid';
+
+import loggerPkg from './logger.mjs';
+const { initLogger, logEvent } = loggerPkg;
+
 
 dotenv.config({ path: './secrets.env' });
 
-// unique ID generation for sessions
-import {v4 as uuidv4} from 'uuid';
-
 const app = express();
-const port = process.env.PORT;
+const port = process.env.PORT || 3000;
 const __dirname = path.resolve();
 const saltRounds = 10;
 
@@ -46,6 +47,7 @@ const client = new MongoClient(uri, {
   }
 });
 
+// Connect to MongoDB and init logger
 async function connectToMongoDB() {
   try {
     await client.connect();
@@ -53,18 +55,59 @@ async function connectToMongoDB() {
     console.log("Connected to MongoDB!");
   } catch (error) {
     console.error("Error connecting to MongoDB:", error);
-    process.exit(1); // Exit the process if there's an error connecting to MongoDB
+    process.exit(1);
   }
 }
 
-// Initialize MongoDB connection
-connectToMongoDB();
+// call connect & init logger
+await connectToMongoDB();
+initLogger(client);
 
+// Express middlewares
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+// session initialization (existing config preserved)
+app.use(session({
+  name: 'SessionCookie',
+  genid: function(req) {
+    return uuidv4();
+  },
+  secret: process.env.SESSION_SECRET || 'secretpass',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, maxAge: 7 * 24 * 3600 * 1000 }
+}));
+
+// serve static files
+app.use('/', express.static('public', { index: "index" }));
+
+// expose user to templates
+app.use((req, res, next) => {
+  if (req.session && req.session.userInfo) {
+    res.locals.user = req.session.userInfo;
+  } else {
+    res.locals.user = null;
+  }
+  next();
 });
 
+// Request-audit middleware: lightweight trace for every request
+app.use((req, res, next) => {
+  try {
+    const uid = req.session?.userInfo?._id?.toString() || null;
+    // Avoid noisy logging for static assets by basic filter (optional)
+    if (!req.originalUrl.startsWith('/public') && !req.originalUrl.startsWith('/favicon')) {
+      logEvent(req, "debug", `Route accessed: ${req.method} ${req.originalUrl}`, uid);
+    }
+  } catch (e) {
+    // Swallow any logging errors to avoid breaking requests
+    console.error("Request-log middleware error", e);
+  }
+  next();
+});
+
+// view engine
 app.set("view engine", "ejs");
 app.set("views", "views");
 
@@ -79,243 +122,212 @@ app.get('/', (req, res) =>{
 app.get('/index', (req, res) =>{
 
   res.render("index")
+// global variable used in original file
+var curUser = null;
 
+// Root / index route
+app.get('/index', (req, res) => {
+  logEvent(req, 'info', 'Index page accessed', req.session.userInfo?._id?.toString());
+  res.render("index");
 });
 
-// gets posts
-app.get('/posts', async (req,res) =>{
+// POSTS, COMMENTS, LIKES routes (with improved logging & error handling)
 
-  const postCollection = client.db("ForumsDB").collection("Posts");
-
-  // Execute query 
-  const cursor = postCollection.find();
-  
-  // Print a message if no documents were found
-  if ((postCollection.countDocuments()) === 0) {
-    console.log("No documents found!");
-  }
-
-  const array =  await cursor.toArray();
-
-  res.status(200).json(array);
-  
-});
-
-// gets comments
-app.get('/comments', async (req,res) =>{
-
-  const commCollection = client.db("ForumsDB").collection("Comments");
-
-  // Execute query 
-  const cursor = commCollection.find();
-  
-  // Print a message if no documents were found
-  if ((commCollection.countDocuments()) === 0) {
-    console.log("No comment documents found!");
-  }
-
-  const array =  await cursor.toArray();
-
-  console.log('sending comments');
-  res.status(200).json(array);
-  
-});
-
-app.post('/postComment', async (req,res) =>{
-
-  const commentCollection = client.db("ForumsDB").collection("Comments");
-  const date = new Date(Date.now()).toUTCString();
-  
-  const {comment,postID,authorID} = req.body;
-  const result = await commentCollection.insertOne({
-    comment:comment,
-    date:date,
-    authorID:authorID,
-    postID:postID,
-    dislikes: 0,
-    likes: 0,
-  });
-  res.redirect("/viewpost?postID="+postID);
-
-});
-
-// gets likes
-app.get('/likes', async (req,res) =>{
-
-  const likeCollection = client.db("ForumsDB").collection("Likes");
-
-  // Execute query 
-  const cursor = likeCollection.find();
-  
-  // Print a message if no documents were found
-  if ((likeCollection.countDocuments()) === 0) {
-    console.log("No comment documents found!");
-  }
-
-  const array =  await cursor.toArray();
-
-  console.log('sending comments');
-  res.status(200).json(array);
-  
-});
-
-// for when a user sends a like or a dislike
-app.get('/like', async (req,res) =>{
-  // like values are '1', dislike values are '-1'
-  console.log(req.query.postID);
-
-  if(req.query.postID && req.session.userInfo) { // if user is logged in and header is provided
-    const likeCollection = client.db("ForumsDB").collection("Likes");
+// GET posts
+app.get('/posts', async (req, res) => {
+  try {
     const postCollection = client.db("ForumsDB").collection("Posts");
-    const commCollection = client.db("ForumsDB").collection("Comments");
-    var likeValue = 1; // assumes it is a like instead of a dislike before it gets any header value
-    var likerID = String(req.session.userInfo._id);
-    var postID = req.query.postID
-    var postObjID = new ObjectId(postID);
-    var postTarget = await postCollection.findOne({_id: postObjID});
+    const cursor = postCollection.find();
+    const array = await cursor.toArray();
 
-    console.log('found a post to like, likeValue is: ' + likeValue);
-    
-    if(req.query.likeValue) { // if there is a header value
-      console.log('Received a like/dislike value');
-      likeValue = req.query.likeValue;
+    if (!array || array.length === 0) {
+      logEvent(req, 'info', 'Posts endpoint returned zero documents', req.session.userInfo?._id?.toString());
+    } else {
+      logEvent(req, 'info', 'Posts fetched from database', req.session.userInfo?._id?.toString());
     }
 
-    // var likeToSend = await likeCollection.findOne({ likerID: likerID, postID: postID });
-
-    // if(likeToSend) { // if the user has liked/disliked the post before
-
-    console.log('User has already liked/disliked this post, updating value');
-    const filter = { likerID: likerID, postID: postID };
-    const updates = {like:likeValue};
-    
-    // Update the user document with the accumulated updates
-    await likeCollection.updateOne(filter, { $set: updates },{upsert:true});
-
-    // }
-    // else { // if the user has not liked/disliked the post before
-    //   console.log('User has never liked/disliked this post before, creating new document');
-    //   await likeCollection.insertOne({ // inserts a new like/dislike
-    //     postID: postID,
-    //     like: likeValue,
-    //     likerID: likerID
-    //   });
-
-    // }
-
-    const newLikeCollection = client.db("ForumsDB").collection("Likes");
-    const cursor = newLikeCollection.find({postID: postID}); // finds all likes that have a matching postID
-    const likeArray = await cursor.toArray();
-    // update post or comment with the appropriate amount of likes/dislieks (WIP)
-
-    if(postTarget) { // if the like was targeted to a post
-      // set the post's likes and dislikes to 0
-      await postCollection.updateOne({_id: postObjID}, {$set: {likes: 0}})
-      await postCollection.updateOne({_id: postObjID}, {$set: {dislikes: 0}})
-
-      let likes = 0;
-      let dislikes = 0;
-      // iterate through each like/dislike that matches with the postID target
-      likeArray.forEach((likeDocument) => {
-        if(likeDocument.like == '1') {
-          likes++;
-        }
-        else if(likeDocument.like == '-1') {
-          dislikes++;
-        }
-      }) 
-
-      const postCursor = await postCollection.findOneAndUpdate({_id: postObjID}, {$set: {likes, dislikes}},{returnDocument:'after'})
-      
-      console.log(postCursor);
-      return res.status(200).json(postCursor);
-      
-    }
-    else {
-      postTarget = await commCollection.findOne({_id: postObjID});
-      if(postTarget) { // if the like was not targeted to a comment
-        // set the comment's likes and dislikes to 0
-        await commCollection.updateOne({_id: postObjID}, {$set: {likes: 0}})
-        await commCollection.updateOne({_id: postObjID}, {$set: {dislikes: 0}})
-
-        likeArray.forEach((like) => {
-          if(like.like == '1') {
-            console.log('logged a like');
-            commCollection.updateOne({_id: postObjID}, {$inc: {likes: 1}})
-          } else if (like.like == '-1') {
-            console.log('logged a dislike');
-            commCollection.updateOne({_id: postObjID}, {$inc: {dislikes: 1}})
-          }
-        })
-
-      }
-
-    }
-  
-    // const postCursor = await postCollection.findOne({_id:postObjID}); 
-    // console.log('logged a dislike');
-    // const postCursor = await postCollection.findOneAndUpdate({_id: postObjID}, {$inc: {dislikes: 1}})
-    // console.log(postCursor);
-          
-    // return res.status(200).json(postCursor);
-  }
-      else {
-    return res.status(404).json({ message: "Like request failed" });
+    res.status(200).json(array);
+  } catch (error) {
+    logEvent(req, 'error', `Error fetching posts: ${error.message}`, req.session.userInfo?._id?.toString());
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// updates likes and dislikes value of a post/comment based on what is on 'Likes' collection of the db (WIP, experimental)
+// GET comments
+app.get('/comments', async (req, res) => {
+  try {
+    const commCollection = client.db("ForumsDB").collection("Comments");
+    const cursor = commCollection.find();
+    const array = await cursor.toArray();
+
+    if (!array || array.length === 0) {
+      logEvent(req, 'info', 'Comments endpoint returned zero documents', req.session.userInfo?._id?.toString());
+    } else {
+      logEvent(req, 'info', 'Comments fetched from database', req.session.userInfo?._id?.toString());
+    }
+
+    res.status(200).json(array);
+  } catch (error) {
+    logEvent(req, 'error', `Error fetching comments: ${error.message}`, req.session.userInfo?._id?.toString());
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST comment
+app.post('/postComment', async (req, res) => {
+  try {
+    const commentCollection = client.db("ForumsDB").collection("Comments");
+    const date = new Date(Date.now()).toUTCString();
+    const { comment, postID, authorID } = req.body;
+
+    if (!req.session.userInfo) {
+      logEvent(req, 'warn', 'Unauthorized comment attempt', null);
+      return res.redirect('/login');
+    }
+
+    const result = await commentCollection.insertOne({
+      comment: comment,
+      date: date,
+      authorID: authorID,
+      postID: postID,
+      dislikes: 0,
+      likes: 0,
+    });
+
+    logEvent(req, 'info', `Comment posted on post ${postID} by user ${authorID}`, authorID);
+    res.redirect("/viewpost?postID=" + postID);
+  } catch (error) {
+    logEvent(req, 'error', `Error posting comment: ${error.message}`, req.session.userInfo?._id?.toString());
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET likes
+app.get('/likes', async (req, res) => {
+  try {
+    const likeCollection = client.db("ForumsDB").collection("Likes");
+    const cursor = likeCollection.find();
+    const array = await cursor.toArray();
+
+    if (!array || array.length === 0) {
+      logEvent(req, 'info', 'Likes endpoint returned zero documents', req.session.userInfo?._id?.toString());
+    } else {
+      logEvent(req, 'info', 'Likes data fetched', req.session.userInfo?._id?.toString());
+    }
+
+    res.status(200).json(array);
+  } catch (error) {
+    logEvent(req, 'error', `Error fetching likes: ${error.message}`, req.session.userInfo?._id?.toString());
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET like action (like/dislike)
+app.get('/like', async (req, res) => {
+  try {
+    if (req.query.postID && req.session.userInfo) {
+      const likeCollection = client.db("ForumsDB").collection("Likes");
+      const postCollection = client.db("ForumsDB").collection("Posts");
+      const commCollection = client.db("ForumsDB").collection("Comments");
+
+      let likeValue = '1';
+      const likerID = String(req.session.userInfo._id);
+      const postID = req.query.postID;
+      const postObjID = new ObjectId(postID);
+      const postTarget = await postCollection.findOne({ _id: postObjID });
+
+      if (req.query.likeValue) likeValue = req.query.likeValue;
+
+      const filter = { likerID: likerID, postID: postID };
+      const updates = { like: likeValue };
+
+      await likeCollection.updateOne(filter, { $set: updates }, { upsert: true });
+
+      const cursor = await likeCollection.find({ postID: postID });
+      const likeArray = await cursor.toArray();
+
+      if (postTarget) {
+        await postCollection.updateOne({ _id: postObjID }, { $set: { likes: 0, dislikes: 0 } });
+
+        let likes = 0;
+        let dislikes = 0;
+        likeArray.forEach((likeDocument) => {
+          if (likeDocument.like == '1') likes++;
+          else if (likeDocument.like == '-1') dislikes++;
+        });
+
+        const postCursor = await postCollection.findOneAndUpdate(
+          { _id: postObjID },
+          { $set: { likes, dislikes } },
+          { returnDocument: 'after' }
+        );
+
+        const action = likeValue == '1' ? 'liked' : 'disliked';
+        logEvent(req, 'info', `User ${action} post ${postID}`, likerID);
+        return res.status(200).json(postCursor);
+      } else {
+        const commTarget = await commCollection.findOne({ _id: postObjID });
+        if (commTarget) {
+          await commCollection.updateOne({ _id: postObjID }, { $set: { likes: 0, dislikes: 0 } });
+          likeArray.forEach((like) => {
+            if (like.like == '1') commCollection.updateOne({ _id: postObjID }, { $inc: { likes: 1 } });
+            else if (like.like == '-1') commCollection.updateOne({ _id: postObjID }, { $inc: { dislikes: 1 } });
+          });
+          logEvent(req, 'info', `User ${likerID} reacted to comment ${postID}`, likerID);
+          return res.status(200).json({ message: "Comment reaction updated" });
+        }
+      }
+    } else {
+      logEvent(req, 'warn', 'Unauthorized like attempt', null);
+      return res.status(404).json({ message: "Like request failed" });
+    }
+  } catch (error) {
+    logEvent(req, 'error', `Error processing like: ${error.message}`, req.session.userInfo?._id?.toString());
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// GET updateLikes (recomputes likes/dislikes)
 app.get('/updateLikes', async (req, res) => {
+  try {
+    if (req.query.postID) {
+      const likeCollection = client.db("ForumsDB").collection("Likes");
+      const postCollection = client.db("ForumsDB").collection("Posts");
+      const commCollection = client.db("ForumsDB").collection("Comments");
 
-  if(req.query.postID) {
-    const likeCollection = client.db("ForumsDB").collection("Likes");
-    const postCollection = client.db("ForumsDB").collection("Posts");
-    const commCollection = client.db("ForumsDB").collection("Comments");
-    var postID = req.query.postID;
-    var postObjID = new ObjectId(postID);
-    var postTarget = await postCollection.findOne({_id: postObjID});
-    const cursor = likeCollection.find({postID: postID}); // finds all likes that have a matching postID
-    const likeArray = await cursor.toArray();
+      const postID = req.query.postID;
+      const postObjID = new ObjectId(postID);
+      let postTarget = await postCollection.findOne({ _id: postObjID });
+      const cursor = likeCollection.find({ postID: postID });
+      const likeArray = await cursor.toArray();
 
-    if(postTarget) { // if the like was targeted to a post
-      // set the post's likes and dislikes to 0
-      await postCollection.updateOne({_id: postObjID}, {$set: {likes: 0}})
-      await postCollection.updateOne({_id: postObjID}, {$set: {dislikes: 0}})
-
-      likeArray.forEach((like) => {
-        if(like.like == '1') {
-          console.log('logged a like');
-          postCollection.updateOne({_id: postObjID}, {$inc: {likes: 1}})
-        } else if (like.like == '-1') {
-          console.log('logged a dislike');
-          postCollection.updateOne({_id: postObjID}, {$inc: {dislikes: 1}})
-        }
-      })
-      
-    }
-    else {
-      postTarget = await commCollection.findOne({_id: postObjID});
-      if(postTarget) { // if the like was not targeted to a comment
-        // set the comment's likes and dislikes to 0
-        await commCollection.updateOne({_id: postObjID}, {$set: {likes: 0}})
-        await commCollection.updateOne({_id: postObjID}, {$set: {dislikes: 0}})
-
+      if (postTarget) {
+        await postCollection.updateOne({ _id: postObjID }, { $set: { likes: 0, dislikes: 0 } });
         likeArray.forEach((like) => {
-          if(like.like == '1') {
-            console.log('logged a like');
-            commCollection.updateOne({_id: postObjID}, {$inc: {likes: 1}})
-          } else if (like.like == '-1') {
-            console.log('logged a dislike');
-            commCollection.updateOne({_id: postObjID}, {$inc: {dislikes: 1}})
-          }
-        })
-
+          if (like.like == '1') postCollection.updateOne({ _id: postObjID }, { $inc: { likes: 1 } });
+          else if (like.like == '-1') postCollection.updateOne({ _id: postObjID }, { $inc: { dislikes: 1 } });
+        });
+        logEvent(req, 'info', `Likes updated for post ${postID}`, req.session.userInfo?._id?.toString());
+      } else {
+        postTarget = await commCollection.findOne({ _id: postObjID });
+        if (postTarget) {
+          await commCollection.updateOne({ _id: postObjID }, { $set: { likes: 0, dislikes: 0 } });
+          likeArray.forEach((like) => {
+            if (like.like == '1') commCollection.updateOne({ _id: postObjID }, { $inc: { likes: 1 } });
+            else if (like.like == '-1') commCollection.updateOne({ _id: postObjID }, { $inc: { dislikes: 1 } });
+          });
+          logEvent(req, 'info', `Likes updated for comment ${postID}`, req.session.userInfo?._id?.toString());
+        }
       }
-
+      return res.status(200).json({ message: "Likes updated" });
+    } else {
+      logEvent(req, 'warn', 'updateLikes called without postID', req.session.userInfo?._id?.toString());
+      return res.status(400).json({ message: "postID required" });
     }
-
+  } catch (error) {
+    logEvent(req, 'error', `Error updating likes: ${error.message}`, req.session.userInfo?._id?.toString());
+    return res.status(500).json({ message: "Internal server error" });
   }
-
 });
 
 app.get('/trending',async (req,res)=> {
@@ -479,8 +491,11 @@ app.get('/filter', async (req, res) => {
   res.status(200).json(array);
 })
 
+// LOGOUT
 app.get('/logout', (req, res) => {
-  // Destroy the session
+  const userId = req.session.userInfo?._id?.toString();
+  const username = req.session.userInfo?.username;
+
   req.session.destroy((err) => {
       if (err) {
           console.error("Error destroying session:", err);
@@ -549,48 +564,94 @@ app.post('/editProfile', async (req, res) => {
     }
   } catch (error) {
     console.error("Error occurred during editing of profile info", error);
+    if (err) {
+      logEvent(req, 'error', `Error destroying session: ${err.message}`, userId);
+      return res.status(500).json({ message: "Internal server error." });
+    }
+    logEvent(req, 'info', `User logged out: ${username}`, userId);
+    curUser = null;
+    res.clearCookie('SessionCookie');
+    res.redirect('/login');
+  });
+});
+
+// Profile & user related routes
+
+app.get('/profile-edit', (req, res) => {
+  logEvent(req, 'info', 'Profile edit page accessed', req.session.userInfo?._id?.toString());
+  res.render("profile-edit");
+});
+
+app.post('/profile-edit', async (req, res) => {
+  let userID = req.session.userInfo._id;
+
+  try {
+    const usersCollection = client.db("ForumsDB").collection("Users");
+    const { username, description, dlsuRole, dlsuID, gender, profilePic } = req.body;
+
+    const filter = { _id: new ObjectId(userID) };
+    const updates = {};
+
+    if (username) updates.username = username;
+    if (description) updates.description = description;
+    if (dlsuRole) updates.dlsuRole = dlsuRole;
+    if (dlsuID) updates.dlsuID = dlsuID;
+    if (gender) updates.gender = gender;
+    if (profilePic) updates.profilePic = profilePic;
+
+    const result = await usersCollection.updateOne(filter, { $set: updates });
+
+    if (result.modifiedCount === 1) {
+      const result2 = await usersCollection.findOne(filter);
+      req.session.userInfo = result2;
+
+      logEvent(req, 'info', `Profile updated for user ${username || req.session.userInfo.username}`, userID.toString());
+      return res.redirect('/profile');
+    } else {
+      logEvent(req, 'warn', `Profile update failed for user ${userID}`, userID.toString());
+      return res.status(404).json({ message: "User not found or could not be updated." });
+    }
+  } catch (error) {
+    logEvent(req, 'error', `Error during user edit: ${error.message}`, userID.toString());
     return res.status(500).json({ message: "Internal server error." });
   }
 });
 
-app.get('/userPosts', async (req,res) =>{
-
+app.get('/userPosts', async (req, res) => {
   let userID = req.header('userID');
 
-  if(userID){
-    try{
+  if (userID) {
+    try {
       const postCollection = client.db("ForumsDB").collection("Posts");
-      // Execute query 
-      const cursor = postCollection.find({authorID:userID});
-    
-      // Print a message if no documents were found
-      if ((await postCollection.countDocuments({authorID:userID})) === 0) {
-        console.log("No documents found!");
-      }
-    
-      const array =  await cursor.toArray();
-    
+      const cursor = postCollection.find({ authorID: userID });
+      const array = await cursor.toArray();
+
+      logEvent(req, 'info', `User posts fetched for user ${userID}`, req.session.userInfo?._id?.toString());
       res.status(200).json(array);
+    } catch (error) {
+      logEvent(req, 'error', `Error locating user posts: ${error.message}`, req.session.userInfo?._id?.toString());
+      res.status(500).json({ message: "Internal server error" });
     }
-    catch(error){
-      console.error("Error locating user posts");
-    }
+  } else {
+    logEvent(req, 'warn', 'userPosts called without userID', req.session.userInfo?._id?.toString());
+    res.status(400).json({ message: "userID header required" });
   }
-  
 });
 
-app.get('/login', (req, res) =>{
+// LOGIN / SIGNUP / FORGOT PASSWORD flows
 
+app.get('/login', (req, res) => {
+  logEvent(req, 'info', 'Login page accessed');
   res.render("login", { error: null });
-
 });
 
-// Handle login process with attempt tracking and lockout
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    const userIP = req.ip || req.connection?.remoteAddress;
 
     if (!email || !password) {
+      logEvent(req, 'warn', 'Login attempt with missing credentials', null);
       return res.render("login", { error: "Email and password are required." });
     }
 
@@ -598,187 +659,139 @@ app.post('/login', async (req, res) => {
     const user = await usersCollection.findOne({ email: email });
 
     if (!user) {
+      logEvent(req, 'warn', `Failed login attempt for non-existent email: ${email}`, null);
       return res.render("login", { error: "Invalid email or password." });
     }
 
-    // Check if account is locked
     if (user.lockUntil && user.lockUntil > Date.now()) {
       const remainingTime = Math.ceil((user.lockUntil - Date.now()) / 1000);
-      return res.render("login", { 
+      logEvent(req, 'warn', `Login attempt on locked account: ${email}`, user._id.toString());
+      return res.render("login", {
         error: `Account is locked. Please try again in ${remainingTime} seconds.`,
         lockout: true,
         remainingTime: remainingTime
       });
     }
 
-    // Check password
     const passwordMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordMatch) {
-      // Increment failed login attempts
       const failedAttempts = (user.failedLoginAttempts || 0) + 1;
       const updates = { failedLoginAttempts: failedAttempts };
 
-      // Lock account after 5 failed attempts
       if (failedAttempts >= 5) {
-        updates.lockUntil = Date.now() + 30000; // Lock for 30 seconds
-        updates.failedLoginAttempts = 0; // Reset counter after locking
-        
-        await usersCollection.updateOne(
-          { email: email },
-          { $set: updates }
-        );
+        updates.lockUntil = Date.now() + 30000;
+        updates.failedLoginAttempts = 0;
+        await usersCollection.updateOne({ email: email }, { $set: updates });
 
-        return res.render("login", { 
+        logEvent(req, 'warn', `Account locked due to too many failed attempts: ${email}`, user._id.toString());
+        return res.render("login", {
           error: "Too many failed login attempts. Account locked for 30 seconds.",
           lockout: true,
           remainingTime: 30
         });
       }
 
-      // Update failed attempts
-      await usersCollection.updateOne(
-        { email: email },
-        { $set: updates }
-      );
+      await usersCollection.updateOne({ email: email }, { $set: updates });
 
       const attemptsLeft = 5 - failedAttempts;
-      return res.render("login", { 
+      logEvent(req, 'warn', `Failed login attempt for user: ${user.username} (${attemptsLeft} attempts left)`, user._id.toString());
+      return res.render("login", {
         error: `Invalid email or password. ${attemptsLeft} attempt(s) remaining.`,
         attemptsLeft: attemptsLeft
       });
     }
 
-    // Successful login - reset failed attempts and lock
+    // Successful login
     await usersCollection.updateOne(
       { email: email },
-      { 
+      {
         $set: { failedLoginAttempts: 0 },
         $unset: { lockUntil: "" }
       }
     );
 
-    // Set session and redirect
     req.session.userInfo = user;
     console.log("User logged in successfully");
+    curUser = user;
+
+    logEvent(req, 'info', `User logged in successfully: ${user.username}`, user._id.toString());
     return res.redirect('/index');
 
   } catch (error) {
+    logEvent(req, 'error', `Login error: ${error.message}`);
     console.error("Error occurred during login:", error);
     return res.render("login", { error: "Internal server error." });
   }
 });
 
-// Forgot password page
 app.get('/forgot-password', (req, res) => {
+  logEvent(req, 'info', 'Forgot password page accessed');
   res.render("forgot-password", { step: 1, error: null });
 });
 
-// Handle forgot password - verify email and security question
 app.post('/forgot-password', async (req, res) => {
   try {
     const { email, securityAnswer, newPassword, confirmPassword } = req.body;
     const usersCollection = client.db("ForumsDB").collection("Users");
 
-    // Step 1: Verify email and show security question
     if (email && !securityAnswer) {
       const user = await usersCollection.findOne({ email: email });
-      
       if (!user) {
-        return res.render("forgot-password", { 
-          step: 1, 
-          error: "Email address not found." 
-        });
+        logEvent(req, 'warn', `Password reset attempt for non-existent email: ${email}`);
+        return res.render("forgot-password", { step: 1, error: "Email address not found." });
       }
 
-      // If user doesn't have a security question set, show error
       if (!user.securityQuestion || !user.securityAnswer) {
-        return res.render("forgot-password", { 
-          step: 1, 
-          error: "No security question set for this account. Please contact support." 
-        });
+        logEvent(req, 'warn', `Password reset attempt for account without security question: ${email}`, user._id?.toString());
+        return res.render("forgot-password", { step: 1, error: "No security question set for this account. Please contact support." });
       }
 
-      return res.render("forgot-password", { 
-        step: 2, 
-        email: email,
-        securityQuestion: user.securityQuestion,
-        error: null 
-      });
+      logEvent(req, 'info', `Password reset initiated for: ${email}`, user._id.toString());
+      return res.render("forgot-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: null });
     }
 
-    // Step 2: Verify security answer and reset password
     if (email && securityAnswer && newPassword) {
       const user = await usersCollection.findOne({ email: email });
-
       if (!user) {
-        return res.render("forgot-password", { 
-          step: 1, 
-          error: "Email address not found." 
-        });
+        return res.render("forgot-password", { step: 1, error: "Email address not found." });
       }
 
-      // Verify security answer (case-insensitive)
       if (user.securityAnswer.toLowerCase() !== securityAnswer.toLowerCase()) {
-        return res.render("forgot-password", { 
-          step: 2,
-          email: email,
-          securityQuestion: user.securityQuestion,
-          error: "Incorrect answer to security question." 
-        });
+        logEvent(req, 'warn', `Incorrect security answer for password reset: ${email}`, user._id.toString());
+        return res.render("forgot-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: "Incorrect answer to security question." });
       }
 
-      // Validate new password
       if (newPassword !== confirmPassword) {
-        return res.render("forgot-password", { 
-          step: 2,
-          email: email,
-          securityQuestion: user.securityQuestion,
-          error: "Passwords do not match." 
-        });
+        return res.render("forgot-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: "Passwords do not match." });
       }
 
-      // Validate password requirements
       const passwordValidation = validatePassword(newPassword);
       if (!passwordValidation.isValid) {
-        return res.render("forgot-password", { 
-          step: 2,
-          email: email,
-          securityQuestion: user.securityQuestion,
-          error: passwordValidation.message 
-        });
+        return res.render("forgot-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: passwordValidation.message });
       }
 
-      // Hash new password and update
       const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
       await usersCollection.updateOne(
         { email: email },
-        { 
-          $set: { 
-            password: hashedPassword,
-            failedLoginAttempts: 0
-          },
+        {
+          $set: { password: hashedPassword, failedLoginAttempts: 0 },
           $unset: { lockUntil: "" }
         }
       );
 
-      return res.render("forgot-password", { 
-        step: 3,
-        success: true,
-        error: null 
-      });
+      logEvent(req, 'info', `Password reset successful for: ${email}`, user._id.toString());
+      return res.render("forgot-password", { step: 3, success: true, error: null });
     }
 
   } catch (error) {
+    logEvent(req, 'error', `Password reset error: ${error.message}`);
     console.error("Error during password reset:", error);
-    return res.render("forgot-password", { 
-      step: 1, 
-      error: "Internal server error." 
-    });
+    return res.render("forgot-password", { step: 1, error: "Internal server error." });
   }
 });
 
-// Password validation function
+// Password validation (copied from original)
 function validatePassword(password) {
   const minLength = 8;
   const hasUpperCase = /[A-Z]/.test(password);
@@ -786,120 +799,89 @@ function validatePassword(password) {
   const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
 
   if (password.length < minLength) {
-    return { 
-      isValid: false, 
-      message: `Password must be at least ${minLength} characters long.` 
-    };
+    return { isValid: false, message: `Password must be at least ${minLength} characters long.` };
   }
-
   if (!hasUpperCase) {
-    return { 
-      isValid: false, 
-      message: "Password must contain at least one uppercase letter." 
-    };
+    return { isValid: false, message: "Password must contain at least one uppercase letter." };
   }
-
   if (!hasNumber) {
-    return { 
-      isValid: false, 
-      message: "Password must contain at least one number." 
-    };
+    return { isValid: false, message: "Password must contain at least one number." };
   }
-
   if (!hasSpecialChar) {
-    return { 
-      isValid: false, 
-      message: "Password must contain at least one special character (!@#$%^&*()_+-=[]{};':\"\\|,.<>/?)" 
-    };
+    return { isValid: false, message: "Password must contain at least one special character (!@#$%^&*()_+-=[]{};':\"\\|,.<>/?)" };
   }
-
   return { isValid: true, message: "Password is valid." };
 }
 
-// function for getting profile info
+// userData route
 app.get('/userData', async (req, res) => {
-
   let userID = req.header('userID');
-  
-  if (userID === null || userID === "null"){
-    try{
-      userID = req.session.userInfo._id;
+
+  try {
+    if (userID === null || userID === "null") {
+      userID = req.session.userInfo?._id;
+      if (!userID) {
+        logEvent(req, 'warn', 'Unauthorized user data access attempt');
+        return res.status(401).json({ message: "No logged in user found", status: 401 });
+      }
     }
-    catch(err){
-      console.log("Cannot read user id");
+
+    const usersCollection = client.db("ForumsDB").collection("Users");
+    const userToSend = await usersCollection.findOne({ _id: new ObjectId(userID) });
+
+    if (!userToSend) {
+      logEvent(req, 'warn', `User data not found for ID: ${userID}`);
+      return res.status(404).json({ message: "User not found or could not be deleted." });
     }
-    if (userID === null || userID === "null"){
-      console.log(true);
-      return res.status(401).json({message:"No logged in user found",status:401});
-    }
+
+    const userData = [{
+      '_id': userToSend._id,
+      'username': userToSend.username,
+      'profilePic': userToSend.profilePic,
+      'dlsuID': userToSend.dlsuID,
+      'dlsuRole': userToSend.dlsuRole,
+      'gender': userToSend.gender,
+      'description': userToSend.description
+    }];
+
+    logEvent(req, 'info', `User data fetched for: ${userToSend.username}`, userID.toString());
+    res.json(userData);
+  } catch (error) {
+    logEvent(req, 'error', `Error locating user: ${error.message}`);
+    res.status(500).json({ message: "Internal server error." });
   }
-  if(userID){
-    
-    try{
-      const usersCollection = client.db("ForumsDB").collection("Users");
-  
-      /*if(req.header('userToView')) { // if userToView was sent in header, should be a String
-        var userToView = req.header('userToView');
-        var userToSend = await usersCollection.findOne({ username: userToView });
-        console.log('sending user based on userToView');
-      }
-      else */ // if userID was sent in header, should be a String
-      var userToSend = await usersCollection.findOne({ _id: new ObjectId(userID) });
-      
-      // if no user was found
-      if(!userToSend) {
-        console.log('No valid user found');
-        return res.status(404).json({ message: "User not found or could not be deleted." });
-      }
-  
-      const userData = [{
-        '_id': userToSend._id,
-        'username': userToSend.username,
-        'profilePic': userToSend.profilePic,
-        'dlsuID': userToSend.dlsuID,
-        'dlsuRole': userToSend.dlsuRole,
-        'gender': userToSend.gender,
-        'description': userToSend.description
-      }];
-      
-      if(userData) {
-        res.json(userData);
-      }
-    } catch (error) {
-      console.error("Error locating the user");
-    }
-
-  }  
-
-  
-})
-
-app.get('/profile', (req, res) =>{
-
-    res.render("profile");
-
 });
 
-app.get('/create',(req, res) =>{
-    res.render("create");
-  }
-);
+// Profile view & create post routes
+app.get('/profile', (req, res) => {
+  logEvent(req, 'info', 'Profile page accessed', req.session.userInfo?._id?.toString());
+  res.render("profile");
+});
 
-// registers posts into the db
-app.post('/create', async (req,res) => {
-  
-  try{
+app.get('/create', (req, res) => {
+  logEvent(req, 'info', 'Create post page accessed', req.session.userInfo?._id?.toString());
+  res.render("create");
+});
 
     let sessionUser = req.session.userInfo;
+// POST create post
+app.post('/create', async (req, res) => {
+  try {
+    const userID = req.session.userInfo;
 
-    const {subject,message,tag} = req.body;
+    if (!userID) {
+      logEvent(req, 'warn', 'Unauthorized post creation attempt');
+      return res.redirect('/login');
+    }
 
-    if (!subject || !message || !tag){
+    const { subject, message, tag } = req.body;
+
+    if (!subject || !message || !tag) {
+      logEvent(req, 'warn', `Incomplete post data from user: ${userID.username}`, userID._id.toString());
       return res.redirect('/create');
     }
-    
-    const date = new Date(Date.now()).toUTCString();
 
+    const date = new Date(Date.now()).toUTCString();
     const postsCollection = client.db("ForumsDB").collection("Posts");
 
     const result = await postsCollection.insertOne({
@@ -912,223 +894,273 @@ app.post('/create', async (req,res) => {
       dislikes: 0,
       likes: 0,
       authorID:sessionUser._id.toString(),
+      author: userID.username,
+      authorPic: curUser?.profilePic || "",
+      subject: subject,
+      message: message,
+      tag: tag,
+      date: date,
+      dislikes: 0,
+      likes: 0,
+      authorID: curUser?._id?.toString(),
     });
 
-    console.log("test");
-
+    logEvent(req, 'info', `Post created: "${subject}" by ${userID.username}`, userID._id.toString());
     res.redirect("/index");
 
+  } catch (error) {
+    logEvent(req, 'error', `Post creation error: ${error.message}`, req.session.userInfo?._id?.toString());
+    console.error("Error occurred during post creation.", error);
+    return res.status(500).json({ message: "Internal server error." });
   }
-  catch(error){
-      console.error("Error occurred during post creation.", error);
-      return res.status(500).json({ message: "Internal server error." });
-  }
-
 });
 
+// POST delete
 app.post('/delete', async (req, res) => {
   try {
+    const { keyMsg, keySubject } = req.body;
 
-    const {keyMsg,keySubject} = req.body;
+    if (!req.session.userInfo) {
+      logEvent(req, 'warn', 'Unauthorized post deletion attempt');
+      return res.redirect('/login');
+    }
 
-    // Get the Posts collection from the database
     const postsCollection = client.db("ForumsDB").collection("Posts");
+    const result = await postsCollection.deleteOne({ subject: keySubject, message: keyMsg });
 
-    // Delete the post with the provided post ID
-    const result = await postsCollection.deleteOne({subject:keySubject,message:keyMsg});
-
-    // Check if the post was deleted successfully
     if (result.deletedCount === 1) {
-      console.log("Post deleted successfully");
+      logEvent(req, 'info', `Post deleted: "${keySubject}" by ${req.session.userInfo.username}`, req.session.userInfo._id.toString());
       return res.redirect('/index');
     } else {
+      logEvent(req, 'warn', `Post deletion failed: "${keySubject}"`, req.session.userInfo._id.toString());
       return res.status(404).json({ message: "Post not found or could not be deleted." });
     }
   } catch (error) {
+    logEvent(req, 'error', `Post deletion error: ${error.message}`, req.session.userInfo?._id?.toString());
     console.error("Error occurred during post deletion:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
 });
 
-
-app.get('/signup', (req, res) =>{
-
+// Signup and edit post/profile routes and logs page (admin)
+app.get('/signup', (req, res) => {
+  logEvent(req, 'info', 'Signup page accessed');
   res.render("signup", { error: null });
-
 });
 
-// Handle registering users to the DB with enhanced validation
 app.post('/signup', async (req, res) => {
   try {
-      const { email, username, password, confirmpassword, securityQuestion, securityAnswer } = req.body;
-      
-      // Make sure all required fields are provided
-      if (!email || !username || !password || !confirmpassword) {
-          return res.render("signup", { 
-            error: "All fields are required." 
-          });
-      }
+    const { email, username, password, confirmpassword, securityQuestion, securityAnswer } = req.body;
 
-      // Check if passwords match
-      if (password !== confirmpassword) {
-          return res.render("signup", { 
-            error: "Passwords do not match." 
-          });
-      }
+    if (!email || !username || !password || !confirmpassword) {
+      logEvent(req, 'warn', 'Signup attempt with missing fields', null);
+      return res.render("signup", { error: "All fields are required." });
+    }
 
-      // Validate password strength
-      const passwordValidation = validatePassword(password);
-      if (!passwordValidation.isValid) {
-          return res.render("signup", { 
-            error: passwordValidation.message 
-          });
-      }
+    if (password !== confirmpassword) {
+      logEvent(req, 'warn', 'Signup attempt with mismatched passwords', null);
+      return res.render("signup", { error: "Passwords do not match." });
+    }
 
-      const usersCollection = client.db("ForumsDB").collection("Users");
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      logEvent(req, 'warn', 'Signup attempt with weak password', null);
+      return res.render("signup", { error: passwordValidation.message });
+    }
 
-      // Check if username already exists (case-insensitive)
-      const existingUsername = await usersCollection.findOne({ 
-        username: { $regex: new RegExp(`^${username}$`, 'i') } 
-      });
-      
-      if (existingUsername) {
-          return res.render("signup", { 
-            error: "Username already exists. Please choose a different username." 
-          });
-      }
+    const usersCollection = client.db("ForumsDB").collection("Users");
 
-      // Check if email already exists
-      const existingEmail = await usersCollection.findOne({ email: email });
-      
-      if (existingEmail) {
-          return res.render("signup", { 
-            error: "Email address already registered. Please use a different email." 
-          });
-      }
+    const existingUsername = await usersCollection.findOne({
+      username: { $regex: new RegExp(`^${username}$`, 'i') }
+    });
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
+    if (existingUsername) {
+      logEvent(req, 'warn', `Signup attempt with existing username: ${username}`, null);
+      return res.render("signup", { error: "Username already exists. Please choose a different username." });
+    }
 
-      // Insert the user data into the database
-      const result = await usersCollection.insertOne({
-          email: email,
-          username: username,
-          password: hashedPassword,
-          profilePic: "https://news.tulane.edu/sites/default/files/headshot_icon_0.jpg",
-          description: "",
-          dlsuID: "",
-          dlsuRole:  "member",
-          gender: "",
-          securityQuestion: securityQuestion || "What is your favorite color?",
-          securityAnswer: securityAnswer || "",
-          failedLoginAttempts: 0
-      });
+    const existingEmail = await usersCollection.findOne({ email: email });
+    if (existingEmail) {
+      logEvent(req, 'warn', `Signup attempt with existing email: ${email}`, null);
+      return res.render("signup", { error: "Email address already registered. Please use a different email." });
+    }
 
-      // If insertion is successful, respond with a success message
-      if (result.insertedId) {
-          return res.redirect('/login');
-      } else {
-          return res.render("signup", { 
-            error: "Failed to create account. Please try again." 
-          });
-      }
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const result = await usersCollection.insertOne({
+      email: email,
+      username: username,
+      password: hashedPassword,
+      profilePic: "https://news.tulane.edu/sites/default/files/headshot_icon_0.jpg",
+      description: "",
+      dlsuID: "",
+      dlsuRole: "member",
+      gender: "",
+      securityQuestion: securityQuestion || "What is your favorite color?",
+      securityAnswer: securityAnswer || "",
+      failedLoginAttempts: 0
+    });
+
+    if (result.insertedId) {
+      logEvent(req, 'info', `New user registered: ${username}`, result.insertedId.toString());
+      return res.redirect('/login');
+    } else {
+      logEvent(req, 'error', 'User registration failed in database');
+      return res.render("signup", { error: "Failed to create account. Please try again." });
+    }
   } catch (error) {
-      console.error("Error occurred during signup:", error);
-      return res.render("signup", { 
-        error: "Internal server error. Please try again later." 
-      });
+    logEvent(req, 'error', `Signup error: ${error.message}`);
+    console.error("Error occurred during signup:", error);
+    return res.render("signup", { error: "Internal server error. Please try again later." });
   }
 });
 
-app.get('/editPost', (req, res) =>{
-
+app.get('/editPost', (req, res) => {
+  logEvent(req, 'info', 'Edit post page accessed', req.session.userInfo?._id?.toString());
   res.render("editPost");
-
 });
 
 app.post('/editPost', async (req, res) => {
   try {
+    const { curSubject, curMsg, subject, message, tag } = req.body;
 
-    // Extract subject and message from the request body
-    const {curSubject,curMsg,subject, message, tag } = req.body;
-    // Check if postId, subject, and message are provided
+    if (!req.session.userInfo) {
+      logEvent(req, 'warn', 'Unauthorized post edit attempt');
+      return res.redirect('/login');
+    }
+
     if (!subject || !message || !tag) {
+      logEvent(req, 'warn', 'Post edit with incomplete data', req.session.userInfo._id.toString());
       return res.status(400).json({ message: "Post ID, subject, and message are required." });
     }
 
-    // Get the Posts collection from the database
     const postsCollection = client.db("ForumsDB").collection("Posts");
-
-    const filter = {subject:curSubject,message:curMsg};
+    const filter = { subject: curSubject, message: curMsg };
     const updates = {};
 
-    if (subject) {
-      updates.subject = subject;
-    }
-    if (message) {
-      updates.message = message;
-    }
-    if (tag) {
-      updates.tag = tag;
-    }
+    if (subject) updates.subject = subject;
+    if (message) updates.message = message;
+    if (tag) updates.tag = tag;
 
-    // Update the post with the provided post ID
-    const result = await postsCollection.updateOne(filter,{$set:updates});
+    const result = await postsCollection.updateOne(filter, { $set: updates });
 
-    // Check if the post was updated successfully
     if (result.modifiedCount === 1) {
-      console.log("Post edited successfully");
+      logEvent(req, 'info', `Post edited: "${curSubject}" -> "${subject}" by ${req.session.userInfo.username}`, req.session.userInfo._id.toString());
       return res.redirect('/index');
     } else {
+      logEvent(req, 'warn', `Post edit failed: "${curSubject}"`, req.session.userInfo._id.toString());
       return res.status(404).json({ message: "Post not found or could not be updated." });
     }
   } catch (error) {
+    logEvent(req, 'error', `Post edit error: ${error.message}`, req.session.userInfo?._id?.toString());
     console.error("Error occurred during post editing:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
 });
 
-
-app.get('/editProfile', (req, res) =>{
-  
+app.get('/editProfile', (req, res) => {
+  logEvent(req, 'info', 'Edit profile page accessed', req.session.userInfo?._id?.toString());
   res.render("editProfile");
-
 });
 
-app.get('/viewpost', (req, res) =>{
-
+app.get('/viewpost', (req, res) => {
+  logEvent(req, 'info', 'View post page accessed', req.session.userInfo?._id?.toString());
   res.render("viewpost");
-
 });
 
-app.post('/viewpost', (req, res) =>{
-
+app.post('/viewpost', (req, res) => {
+  logEvent(req, 'info', 'View post page accessed (POST)', req.session.userInfo?._id?.toString());
   res.render("viewpost");
-
 });
 
-app.get('/userPosts', (req, res) =>{
-
-  res.render("userPosts");
-
-});
-
-app.get('/userList', (req, res) =>{
-
+app.get('/userList', (req, res) => {
+  logEvent(req, 'info', 'User list page accessed', req.session.userInfo?._id?.toString());
   res.render("userList");
-
 });
 
 app.get("/userListData", async (req, res) => {
-  const usersCollection = client.db("ForumsDB").collection("Users");
+  try {
+    const usersCollection = client.db("ForumsDB").collection("Users");
+    const cursor = usersCollection.find();
+    const array = await cursor.toArray();
 
-  const cursor = usersCollection.find();
+    logEvent(req, 'info', 'User list data fetched', req.session.userInfo?._id?.toString());
+    res.json(array);
+  } catch (error) {
+    logEvent(req, 'error', `Error fetching user list: ${error.message}`, req.session.userInfo?._id?.toString());
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
-  // Print a message if no documents were found
-  if ((await usersCollection.countDocuments()) === 0) {
-    console.log("No documents found!");
+// Logs route - Admin only
+app.get('/logs', async (req, res) => {
+  if (!req.session.userInfo) {
+    logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
+    return res.redirect('/login');
   }
 
-  const array =  await cursor.toArray();
-  res.json(array);
+  if (req.session.userInfo.dlsuRole !== 'admin') {
+    logEvent(req, 'warn', `Non-admin user attempted to access logs: ${req.session.userInfo.username}`, req.session.userInfo._id.toString());
+    return res.status(403).render('error', {
+      message: 'Access Denied',
+      error: 'You must be an administrator to view system logs.'
+    });
+  }
+
+  try {
+    const logsCollection = client.db("ForumsDB").collection("Logs");
+
+    const page = parseInt(req.query.page) || 1;
+    const level = req.query.level || 'all';
+    const date = req.query.date || '';
+    const search = req.query.search || '';
+    const limit = 20;
+
+    let filter = {};
+
+    if (level !== 'all') filter.level = level;
+    if (date) filter.timestamp = { $gte: new Date(date) };
+    if (search) filter.message = { $regex: search, $options: 'i' };
+
+    const totalLogs = await logsCollection.countDocuments(filter);
+    const totalPages = Math.ceil(totalLogs / limit);
+    const skip = (page - 1) * limit;
+
+    const logs = await logsCollection.find(filter)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    logEvent(req, 'info', 'Logs page accessed by admin', req.session.userInfo._id.toString());
+    res.render('logs', {
+      logs: logs,
+      currentPage: page,
+      totalPages: totalPages
+    });
+
+  } catch (error) {
+    logEvent(req, 'error', `Error fetching logs: ${error.message}`, req.session.userInfo._id?.toString());
+    res.status(500).render('logs', {
+      logs: [],
+      currentPage: 1,
+      totalPages: 1,
+      error: "Error loading logs"
+    });
+  }
+});
+
+// global uncaught exception handlers (non-fatal to app if logger fails)
+process.on("unhandledRejection", err => {
+  try { logEvent(null, "error", "Unhandled Promise Rejection: " + (err?.message || err)); } catch (e) { console.error("Logger failed in unhandledRejection", e); }
+});
+process.on("uncaughtException", err => {
+  try { logEvent(null, "error", "Uncaught Exception: " + (err?.message || err)); } catch (e) { console.error("Logger failed in uncaughtException", e); }
+});
+
+// Start server
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+  // Log starting event with system route
+  try { logEvent(null, 'info', `Server started on port ${port}`); } catch (e) { console.error(e); }
 });
