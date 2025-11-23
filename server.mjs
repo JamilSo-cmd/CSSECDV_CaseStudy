@@ -31,6 +31,10 @@ app.use(session(
 
 app.use(express.urlencoded({ extended: true })); // Add this line for form data
 app.use(express.json()); // Add this for JSON parsing
+app.use((req, res, next) => {
+    res.locals.currentUser = req.session.userInfo || null;
+    next();
+});
 
 // MongoDB connection setup
 const uri = process.env.MONGODB_CONN;
@@ -64,7 +68,13 @@ app.listen(port, () => {
 app.set("view engine", "ejs");
 app.set("views", "views");
 
-app.use('/', express.static('public', {index: "index"}))
+app.use('/', express.static('public'))
+
+app.get('/', (req, res) =>{
+
+  res.render("login")
+
+});
 
 app.get('/index', (req, res) =>{
 
