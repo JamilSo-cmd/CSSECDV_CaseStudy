@@ -123,10 +123,40 @@ app.get('/', (req, res) =>{
 var curUser = null;
 
 // Root / index route
-app.get('/index', (req, res) => {
-  logEvent(req, 'info', 'Index page accessed', req.session.userInfo?._id?.toString());
-  res.render("index");
+app.get('/index', async (req, res) => {
+  const user = req.session.userInfo;
+  let lastLoginPopup = null;
+
+  if (req.session.fromLogin) { // only show popup after login
+    const logsCollection = client.db("ForumsDB").collection("Logs");
+
+    const previousAttempts = await logsCollection.find({
+      $or: [
+        { message: `User logged in successfully: ${user.username}` },
+        { message: { $regex: `Failed login attempt for user: ${user.username}` } },
+      ]
+    })
+    .sort({ timestamp: -1 })
+    .limit(2)
+    .toArray();
+
+    if (previousAttempts.length === 2) {
+      const previous = previousAttempts[1]; // attempt before this session
+
+      if (previous.message.includes("successfully")) {
+        lastLoginPopup = `Your last successful login was on ${new Date(previous.timestamp).toLocaleString()}.`;
+      } else {
+        lastLoginPopup = `There was a failed login attempt on ${new Date(previous.timestamp).toLocaleString()}.\nReset your password if this wasn't you.`;
+      }
+    }
+
+    // one-time popup
+    delete req.session.fromLogin;
+  }
+
+  res.render('index', { user, lastLoginPopup });
 });
+
 
 // POSTS, COMMENTS, LIKES routes (with improved logging & error handling)
 
@@ -660,8 +690,9 @@ app.post('/login', async (req, res) => {
     );
 
     req.session.userInfo = user;
+    req.session.fromLogin = true;
 
-    logEvent('info', `User logged in successfully: ${user.username}`, user._id.toString(), userIP);
+    await logEvent(req, 'info', `User logged in successfully: ${user.username}`, user._id.toString());
     return res.redirect('/index');
 
   } catch (error) {
@@ -671,12 +702,12 @@ app.post('/login', async (req, res) => {
   }
 });
 
-app.get('/forgot-password', (req, res) => {
-  logEvent(req, 'info', 'Forgot password page accessed');
-  res.render("forgot-password", { step: 1, error: null });
+app.get('/reset-password', (req, res) => {
+  logEvent(req, 'info', 'Reset password page accessed');
+  res.render("reset-password", { step: 1, error: null });
 });
 
-app.post('/forgot-password', async (req, res) => {
+app.post('/reset-password', async (req, res) => {
   try {
     const { email, securityAnswer, newPassword, confirmPassword } = req.body;
     const usersCollection = client.db("ForumsDB").collection("Users");
@@ -685,36 +716,36 @@ app.post('/forgot-password', async (req, res) => {
       const user = await usersCollection.findOne({ email: email });
       if (!user) {
         logEvent(req, 'warn', `Password reset attempt for non-existent email: ${email}`);
-        return res.render("forgot-password", { step: 1, error: "Email address not found." });
+        return res.render("reset-password", { step: 1, error: "Email address not found." });
       }
 
       if (!user.securityQuestion || !user.securityAnswer) {
         logEvent(req, 'warn', `Password reset attempt for account without security question: ${email}`, user._id?.toString());
-        return res.render("forgot-password", { step: 1, error: "No security question set for this account. Please contact support." });
+        return res.render("reset-password", { step: 1, error: "No security question set for this account. Please contact support." });
       }
 
       logEvent(req, 'info', `Password reset initiated for: ${email}`, user._id.toString());
-      return res.render("forgot-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: null });
+      return res.render("freset-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: null });
     }
 
     if (email && securityAnswer && newPassword) {
       const user = await usersCollection.findOne({ email: email });
       if (!user) {
-        return res.render("forgot-password", { step: 1, error: "Email address not found." });
+        return res.render("reset-password", { step: 1, error: "Email address not found." });
       }
 
       if (user.securityAnswer.toLowerCase() !== securityAnswer.toLowerCase()) {
         logEvent(req, 'warn', `Incorrect security answer for password reset: ${email}`, user._id.toString());
-        return res.render("forgot-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: "Incorrect answer to security question." });
+        return res.render("reset-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: "Incorrect answer to security question." });
       }
 
       if (newPassword !== confirmPassword) {
-        return res.render("forgot-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: "Passwords do not match." });
+        return res.render("reset-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: "Passwords do not match." });
       }
 
       const passwordValidation = validatePassword(newPassword);
       if (!passwordValidation.isValid) {
-        return res.render("forgot-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: passwordValidation.message });
+        return res.render("reset-password", { step: 2, email: email, securityQuestion: user.securityQuestion, error: passwordValidation.message });
       }
 
       // Check password history - prevent reusing last 5 passwords
@@ -723,11 +754,11 @@ app.post('/forgot-password', async (req, res) => {
       // Check current password
       const isCurrentPassword = await bcrypt.compare(newPassword, user.password);
       if (isCurrentPassword) {
-        return res.render("forgot-password", { 
+        return res.render("reset-password", { 
           step: 2,
           email: email,
           securityQuestion: user.securityQuestion,
-          error: "Cannot reuse your current password. Please choose a different password." 
+          error: "Cannot reuse previous passwords. Please choose a different password."
         });
       }
 
@@ -735,11 +766,11 @@ app.post('/forgot-password', async (req, res) => {
       for (let oldHash of passwordHistory) {
         const isOldPassword = await bcrypt.compare(newPassword, oldHash);
         if (isOldPassword) {
-          return res.render("forgot-password", { 
+          return res.render("reset-password", { 
             step: 2,
             email: email,
             securityQuestion: user.securityQuestion,
-            error: "Cannot reuse any of your last 5 passwords. Please choose a different password." 
+            error: "Cannot reuse previous passwords. Please choose a different password."
           });
         }
       }
@@ -766,15 +797,15 @@ app.post('/forgot-password', async (req, res) => {
       );
 
       logEvent(req, 'info', `Password reset successful for: ${email}`, user._id.toString());
-      return res.render("forgot-password", { step: 3, success: true, error: null });
+      return res.render("reset-password", { step: 3, success: true, error: null });
     }
 
   } catch (error) {
     logEvent(req, 'error', `Password reset error: ${error.message}`);
     console.error("Error during password reset:", error);
-    return res.render("forgot-password", { step: 1, error: "Internal server error." });
+    return res.render("reset-password", { step: 1, error: "Internal server error." });
   }
-});
+}); 
 
 // Password validation (copied from original)
 function validatePassword(password) {
@@ -1078,63 +1109,61 @@ app.get("/userListData", async (req, res) => {
 
 // Logs route - Admin only
 app.get('/logs', async (req, res) => {
-    if (!req.session.userInfo) {
-        logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
-        return res.redirect('/login');
-    }
+  if (!req.session.userInfo) {
+    logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
+    return res.redirect('/login');
+  }
 
-    if (req.session.userInfo.dlsuRole !== 'admin') {
-        logEvent(req, 'warn', `Non-admin user attempted to access logs: ${req.session.userInfo.username}`, req.session.userInfo._id.toString());
-        return res.status(403).render('error', {
-            message: 'Access Denied',
-            error: 'You must be an administrator to view system logs.'
-        });
-    }
+  if (req.session.userInfo.dlsuRole !== 'admin') {
+    logEvent(req, 'warn', `Non-admin user attempted to access logs: ${req.session.userInfo.username}`, req.session.userInfo._id.toString());
+    return res.status(403).render('error', {
+      message: 'Access Denied',
+      error: 'You must be an administrator to view system logs.'
+    });
+  }
 
-    try {
-        const logsCollection = client.db("ForumsDB").collection("Logs");
+  try {
+    const logsCollection = client.db("ForumsDB").collection("Logs");
 
-        const page = parseInt(req.query.page) || 1;
-        const level = req.query.level || 'all';
-        const date = req.query.date || '';
-        const search = req.query.search || '';
-        const limit = 20;
+    const page = parseInt(req.query.page) || 1;
+    const level = req.query.level || 'all';
+    const date = req.query.date || '';
+    const search = req.query.search || '';
+    const limit = 20;
 
-        let filter = {};
+    let filter = {};
 
-        if (level !== 'all') filter.level = level;
-        if (date) filter.timestamp = { $gte: new Date(date).toISOString() };
-        if (search) filter.message = { $regex: search, $options: 'i' };
+    if (level !== 'all') filter.level = level;
+    if (date) filter.timestamp = { $gte: new Date(date) };
+    if (search) filter.message = { $regex: search, $options: 'i' };
 
-        const totalLogs = await logsCollection.countDocuments(filter);
-        const totalPages = Math.ceil(totalLogs / limit);
-        const skip = (page - 1) * limit;
+    const totalLogs = await logsCollection.countDocuments(filter);
+    const totalPages = Math.ceil(totalLogs / limit);
+    const skip = (page - 1) * limit;
 
-        // FIX: ALWAYS SORT BY NEWEST FIRST USING _id: -1
-        const logs = await logsCollection.find(filter)
-            .sort({ _id: -1 })   // <--- CORRECT SORTING ORDER
-            .skip(skip)
-            .limit(limit)
-            .toArray();
+    const logs = await logsCollection.find(filter)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
 
-        logEvent(req, 'info', 'Logs page accessed by admin', req.session.userInfo._id.toString());
-        res.render('logs', {
-            logs: logs,
-            currentPage: page,
-            totalPages: totalPages
-        });
+    logEvent(req, 'info', 'Logs page accessed by admin', req.session.userInfo._id.toString());
+    res.render('logs', {
+      logs: logs,
+      currentPage: page,
+      totalPages: totalPages
+    });
 
-    } catch (error) {
-        logEvent(req, 'error', `Error fetching logs: ${error.message}`, req.session.userInfo?._id?.toString());
-        res.status(500).render('logs', {
-            logs: [],
-            currentPage: 1,
-            totalPages: 1,
-            error: "Error loading logs"
-        });
-    }
+  } catch (error) {
+    logEvent(req, 'error', `Error fetching logs: ${error.message}`, req.session.userInfo._id?.toString());
+    res.status(500).render('logs', {
+      logs: [],
+      currentPage: 1,
+      totalPages: 1,
+      error: "Error loading logs"
+    });
+  }
 });
-
 
 // global uncaught exception handlers (non-fatal to app if logger fails)
 process.on("unhandledRejection", err => {

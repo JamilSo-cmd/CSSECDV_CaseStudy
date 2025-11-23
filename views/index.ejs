@@ -10,7 +10,14 @@
     </head>
 
     <body>
-
+        <% if (lastLoginPopup) { %>
+        <div id="lastLoginPopup" class="lastLoginPopup">
+            <p><%= lastLoginPopup %></p>
+            <button onclick="document.getElementById('lastLoginPopup').style.display='none';
+                            document.getElementById('popupOverlay').style.display='none';">Close</button>
+        </div>
+        <div id="popupOverlay" class="popupOverlay"></div>
+        <% } %>
         <table class="main">
         <!--Header Box-->
             <tr>
