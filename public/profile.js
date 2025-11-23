@@ -2,7 +2,13 @@ $(document).ready(function () {
     
     var userID = new URLSearchParams(window.location.search).get('userID');
     var userPostCount = 0;
-    console.log(userID);
+    if(userID == null){
+        try{
+            userID = currentUser._id;
+        }catch(error){
+            console.log("no ID recieved")
+        }
+    }
     // gets user Data from backend
     fetch('/userData', {
         headers: {

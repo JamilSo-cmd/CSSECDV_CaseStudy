@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>System Logs</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script type="text/javascript" src="/logs.js" defer></script>
+        <style>
+            .log-level-error { color: red; font-weight: bold; }
+            .log-level-warn { color: orange; }
+            .log-level-info { color: blue; }
+            .log-level-debug { color: gray; }
+        </style>
+    </head>
+
+    <body>
+        <table class="main">
+            <!--Header Box-->
+            <%- include("partials/header") %>
+
+            <tr>
+                <!--Side Box-->    
+                <%- include("partials/sidebar") %>
+
+                <!--Content here-->
+                <td>
+                    <div class="postWindow">
+                        <!-- Log Controls and Filters -->
+                        <div class="post" style="min-height: 100px; max-height: 150px;">
+                            <div class="postHeader">
+                                <h2 style="margin: 0;">Log Management</h2>
+                            </div>
+                            <div class="postBody" style="min-height: 80px; display: flex; align-items: center; gap: 20px;">
+                                <div>
+                                    <label>Level: 
+                                        <select id="levelFilter">
+                                            <option value="all">All</option>
+                                            <option value="error">Error</option>
+                                            <option value="warn">Warning</option>
+                                            <option value="info">Info</option>
+                                            <option value="debug">Debug</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label>Date: 
+                                        <input type="date" id="dateFilter">
+                                    </label>
+                                </div>
+                                <div>
+                                    <label>Search: 
+                                        <input type="text" id="searchFilter" placeholder="Search logs...">
+                                    </label>
+                                </div>
+                                <div>
+                                    <button id="applyFilters" class="likeButton" style="width: 80px;">Apply</button>
+                                    <button id="clearFilters" class="dislikeButton" style="width: 80px;">Clear</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Log Entries -->
+                        <div class="post">
+                            <div class="postHeader">
+                                <h2 style="margin: 0;">System Logs</h2>
+                            </div>
+                            <div class="postBody" style="min-height: 400px; max-height: 400px; overflow-y: auto;">
+                                <% if (typeof logs !== 'undefined' && logs.length > 0) { %>
+                                    <% logs.forEach(function(log) { %>
+                                        <div class="log-entry" style="padding: 8px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 0.9em;">
+                                            <% 
+                                                // Pretty Singapore time formatting
+                                                let displayTime = "N/A";
+                                                if (log.localTime) {
+                                                    const dateObj = new Date(log.localTime);
+                                                    const opts = { 
+                                                        year: "numeric",
+                                                        month: "short",
+                                                        day: "2-digit",
+                                                        hour: "numeric",
+                                                        minute: "2-digit",
+                                                        hour12: true,
+                                                        timeZone: "Asia/Singapore"
+                                                    };
+                                                    displayTime = dateObj.toLocaleString("en-US", opts) + " SGT";
+                                                }
+                                            %>
+
+                                            <!-- Pretty SG Time -->
+                                            <span style="color: #666; margin-right: 10px;">
+                                                <%= displayTime %>
+                                            </span>
+
+                                            <!-- Log level -->
+                                            <span class="log-level-<%= log.level %>">[<%= log.level.toUpperCase() %>]</span>
+
+                                            <!-- Message -->
+                                            <span><%= log.message %></span>
+
+                                            <!-- Optional user -->
+                                            <% if (log.userId) { %>
+                                                <span style="color: #666;"> - User: <%= log.userId %></span>
+                                            <% } %>
+
+                                            <!-- Optional IP -->
+                                            <% if (log.ip) { %>
+                                                <span style="color: #666;"> - IP: <%= log.ip %></span>
+                                            <% } %>
+                                        </div>
+                                    <% }); %>
+                                <% } else { %>
+                                    <div style="text-align: center; padding: 50px; color: #666;">
+                                        No log entries found
+                                    </div>
+                                <% } %>
+                            </div>
+                            <div class="postFooter">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        Page <%= currentPage %> of <%= totalPages %>
+                                    </div>
+                                    <div>
+                                        <% if (currentPage > 1) { %>
+                                            <button onclick="loadLogs(<%= currentPage - 1 %>)" class="likeButton" style="width: 80px; margin-right: 10px;">Previous</button>
+                                        <% } else { %>
+                                            <button disabled class="likeButton" style="width: 80px; margin-right: 10px;">Previous</button>
+                                        <% } %>
+                                        
+                                        <% if (currentPage < totalPages) { %>
+                                            <button onclick="loadLogs(<%= currentPage + 1 %>)" class="likeButton" style="width: 80px;">Next</button>
+                                        <% } else { %>
+                                            <button disabled class="likeButton" style="width: 80px;">Next</button>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <script>
+            function loadLogs(page) {
+                const level = document.getElementById('levelFilter').value;
+                const date = document.getElementById('dateFilter').value;
+                const search = document.getElementById('searchFilter').value;
+                
+                let url = '/logs?page=' + page;
+                if (level !== 'all') url += '&level=' + level;
+                if (date) url += '&date=' + date;
+                if (search) url += '&search=' + encodeURIComponent(search);
+                
+                window.location.href = url;
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('applyFilters').addEventListener('click', function() {
+                    loadLogs(1);
+                });
+
+                document.getElementById('clearFilters').addEventListener('click', function() {
+                    document.getElementById('levelFilter').value = 'all';
+                    document.getElementById('dateFilter').value = '';
+                    document.getElementById('searchFilter').value = '';
+                    loadLogs(1);
+                });
+
+                // Set current filter values from URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('level')) {
+                    document.getElementById('levelFilter').value = urlParams.get('level');
+                }
+                if (urlParams.get('date')) {
+                    document.getElementById('dateFilter').value = urlParams.get('date');
+                }
+                if (urlParams.get('search')) {
+                    document.getElementById('searchFilter').value = urlParams.get('search');
+                }
+            });
+        </script>
+    </body>
+</html>

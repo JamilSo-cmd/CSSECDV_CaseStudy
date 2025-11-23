@@ -3,7 +3,6 @@ $(document).ready(function () {
     const postID = new URLSearchParams(window.location.search).get('postID');
     const userID = new URLSearchParams(window.location.search).get('userID');
     console.log('postID to view is: ' + postID);
-    console.log(userID);
 
         // does most things for viewPost when it comes to the post itself
         async function loadViewPost() {
@@ -42,8 +41,9 @@ $(document).ready(function () {
                     const userData = await responseUser.json();
                     console.log(userData);  
                     
+                    console.log(currentUser)
                     //TODO: fix admin
-                    if (userData[0]._id === postData[0].authorID || userData[0]._id === "660c5d556224905450a1c10b" /*adminstrator's id*/){
+                    if (String(currentUser._id) === String(postData[0].authorID) || currentUser.dlsuRole === "admin"){
                         $(".post").find(".editButton").show();
                     }
                     if (userData){
