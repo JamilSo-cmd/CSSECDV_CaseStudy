@@ -1,4 +1,7 @@
 $(document).ready(function () {
+
+    var targetID = 0;
+
     $.get("/userListData", function (users) {
         let table = `
             <table style="width: 100%; border-collapse: collapse;">
@@ -16,7 +19,7 @@ $(document).ready(function () {
 
         users.forEach(user => {
             table += `
-                <tr data-id="${user.dlsuID}">
+                <tr data-user='${JSON.stringify(user)}'>
                     <td class="tableRow">${user.username}</td>
                     <td class="tableRow">${user.gender}</td>
                     <td class="tableRow">${user.dlsuID}</td>
@@ -43,18 +46,22 @@ $(document).ready(function () {
 
         // Attach click handlers for dynamic rows
         $(".postBody").on("click", ".editBtn", function () {
-            const row = $(this).closest("tr");
-            const userId = row.data("id");
-            const username = row.find("td:nth-child(1)").text();
-            const gender = row.find("td:nth-child(2)").text();
-            const role = row.find("td:nth-child(4)").text();
+            const user = $(this).closest("tr").data("user");
 
-            $("#editUserId").val(userId);
-            $("#editUsername").val(username);
-            $("#editGender").val(gender);
-            $("#editRole").val(role);
+            targetID = user._id;
+            $("#editUsername").val(user.username);
+            $("#editDlsuID").val(user.dlsuID);
+            $("#editGender").val(user.gender);
+            $("#editRole").val(user.dlsuRole);
+            $("#editEmail").val(user.email || "");
+            $("#editProfilePic").val(user.profilePic || "");
+            $("#editDescription").val(user.description || "");
 
             $("#editModal, #modalOverlay").show();
+        });
+
+        $("#editDlsuID").on("input", function () {
+            this.value = this.value.replace(/\D/g, ''); // remove non-digits
         });
 
         // Close modal
@@ -66,25 +73,23 @@ $(document).ready(function () {
         $("#editUserForm").on("submit", function (e) {
             e.preventDefault();
 
-            const userId = $("#editUserId").val();
-            const updatedUser = {
+            const userId = targetID;
+             const updatedUser = {
                 username: $("#editUsername").val(),
+                dlsuID: $("#editDlsuID").val(),
                 gender: $("#editGender").val(),
-                dlsuRole: $("#editRole").val()
+                dlsuRole: $("#editRole").val(),
+                email: $("#editEmail").val(),
+                profilePic: $("#editProfilePic").val(),
+                description: $("#editDescription").val()
             };
-
             $.ajax({
                 url: `/updateUser/${userId}`,
                 method: "POST",
                 data: updatedUser,
                 success: function (res) {
                     alert("User updated!");
-                    $("#editModal, #modalOverlay").hide();
-
-                    const row = $(`tr[data-id='${userId}']`);
-                    row.find("td:nth-child(1)").text(updatedUser.username);
-                    row.find("td:nth-child(2)").text(updatedUser.gender);
-                    row.find("td:nth-child(4)").text(updatedUser.dlsuRole);
+                    window.location.href = '/userList';
                 },
                 error: function (err) {
                     alert("Failed to update user.");
@@ -93,11 +98,20 @@ $(document).ready(function () {
         });
 
         $(".postBody").on("click", ".deleteBtn", function () {
-            const userId = $(this).closest("tr").data("id");
-            const username = $(this).closest("tr").find("td:first").text();
-            if (confirm(`Are you sure you want to delete ${username}?`)) {
-                alert(`Deleted User with ID: ${userId}`);
-                // TODO: Send delete request to server and remove row
+            const user = $(this).closest("tr").data("user");
+            targetID = user._id;
+            if (confirm(`Are you sure you want to delete ${user.username}?`)) {
+                $.ajax({
+                    url: `/deleteUser/${targetID}`,
+                    method: "DELETE",
+                    success: function (res) {
+                        alert(`user has been deleted.`);
+                        window.location.href = '/userList';
+                    },
+                    error: function (err) {
+                        alert("Failed to delete user.");
+                    }
+                });
             }
         });
     });

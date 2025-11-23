@@ -1042,6 +1042,58 @@ app.post('/editPost', async (req, res) => {
   }
 });
 
+app.post('/updateUser/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const { username, gender, dlsuRole, dlsuID, email, profilePic, description } = req.body;
+
+    const usersCollection = client.db("ForumsDB").collection("Users");
+
+    const updateResult = await usersCollection.updateOne(
+        { _id: new ObjectId(userId) },
+        {
+            $set: {
+                username,
+                gender,
+                dlsuRole,
+                dlsuID,
+                email,
+                profilePic,
+                description
+            }
+        }
+    );
+
+    if (updateResult.modifiedCount === 1) {
+        res.json({ message: "User updated successfully." });
+    } else {
+        res.status(404).json({ error: "User not found or no changes made." });
+    }
+
+  } catch (err) {
+    console.error("Error updating user:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+app.delete('/deleteUser/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const usersCollection = client.db("ForumsDB").collection("Users");
+
+        const deleteResult = await usersCollection.deleteOne({ _id: new ObjectId(userId) });
+
+        if (deleteResult.deletedCount === 1) {
+            res.json({ message: "User deleted successfully." });
+        } else {
+            res.status(404).json({ error: "User not found." });
+        }
+    } catch (err) {
+        console.error("Error deleting user:", err);
+        res.status(500).json({ error: "Internal server error." });
+    }
+});
+
 app.get('/editProfile', (req, res) => {
   logEvent(req, 'info', 'Edit profile page accessed', req.session.userInfo?._id?.toString());
   res.render("editProfile");
