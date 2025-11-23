@@ -251,7 +251,6 @@ app.get('/like', async (req,res) =>{
     // return res.status(200).json(postCursor);
   }
       else {
-    console.log('Like request failed');
     return res.status(404).json({ message: "Like request failed" });
   }
 });
@@ -753,8 +752,7 @@ app.post('/signup', async (req, res) => {
           profilePic: "https://news.tulane.edu/sites/default/files/headshot_icon_0.jpg",
           description: "",
           dlsuID: "",
-          dlsuRole: "",
-          role:"member",
+          dlsuRole: "member",
           gender: ""
       });
 
@@ -846,6 +844,20 @@ app.get('/userPosts', (req, res) =>{
 
 app.get('/userList', (req, res) =>{
 
-  res.render("about");
+  res.render("userList");
 
+});
+
+app.get("/userListData", async (req, res) => {
+  const usersCollection = client.db("ForumsDB").collection("Users");
+
+  const cursor = usersCollection.find();
+
+  // Print a message if no documents were found
+  if ((await usersCollection.countDocuments()) === 0) {
+    console.log("No documents found!");
+  }
+
+  const array =  await cursor.toArray();
+  res.json(array);
 });

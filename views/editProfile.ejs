@@ -32,9 +32,13 @@
                                     <div class="personalInfoWindow">
                                         <p class="personalInput">
                                             Username:<input type="text" id="usernameInput" name="usernameInput"></input></br>
-                                            Gender:<input type="text" id="genderInput" name="genderInput"></input></br>
+                                            Gender:<select id="genderInput" name="genderInput">
+                                                        <option value="" disabled selected>Select gender</option>
+                                                        <option value="Male">Male</option>
+                                                        <option value="Female">Female</option>
+                                                        <option value="Non-binary">Other</option>
+                                                    </select></br>
                                             DLSU ID:<input type="number" id="dlsuIDInput" name="dlsuIDInput"></input></br>
-                                            Role:<input type="text" id="roleInput" name="roleInput"></input></br>
                                             <br><br>
                                             Profile Picture link:<input type="text" id="profilePicInput" name="profilePicInput"></input></br>        
                                         </p>
