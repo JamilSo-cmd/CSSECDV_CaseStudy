@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+
+        <title>User List Page</title>
+        <link rel="stylesheet" href="style.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script type ="text/javascript" src="userList.js" defer></script>
+    </head>
+
+    <body>
+
+        <table class="main">
+        <!--Header Box-->
+            <%- include("partials/header") %>
+            
+            <tr>
+            <!--Side Box-->    
+                <%- include("partials/sidebar") %>
+
+                <!--Content here (images are placeholders)-->
+                <td>
+                    <div class="postWindow">
+                        
+                        <div class="post" style="width: 1200px;">
+                            <!--Header-->
+                            <div class="postHeader"> 
+                                <div><b><h1 style="margin: 0px;padding-left: 5px;">USER LIST</h1></b></div>
+                            </div>
+                            <!--User list Contents -->
+                            <div class="postBody">
+                                
+                            </div>
+                            <div class="postFooter"><p></p></div>
+                        </div>
+                        
+                    </div>
+                </td>
+
+            </tr>
+        </table>    
+                
+    </body>
+
+</html>
