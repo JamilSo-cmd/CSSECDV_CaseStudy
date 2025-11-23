@@ -927,92 +927,21 @@ app.get('/signup', (req, res) => {
 
 app.post('/signup', async (req, res) => {
   try {
-      const { email, username, password, confirmpassword, securityQuestion, securityAnswer } = req.body;
-      
-      // Make sure all required fields are provided
-      if (!email || !username || !password || !confirmpassword) {
-        logEvent(req, 'warn', 'Signup attempt with missing fields', null);
-          return res.render("signup", { 
-            error: "All fields are required." 
-          });
-      }
+    const { email, username, password, confirmpassword, securityQuestion, securityAnswer } = req.body;
 
-      // Check if passwords match
-      if (password !== confirmpassword) {
-          return res.render("signup", { 
-            error: "Passwords do not match." 
-          });
-      }
-
-      // Validate password strength
-      const passwordValidation = validatePassword(password);
-      if (!passwordValidation.isValid) {
-          return res.render("signup", { 
-            error: passwordValidation.message 
-          });
-      }
-
-      const usersCollection = client.db("ForumsDB").collection("Users");
-
-      // Check if username already exists (case-insensitive)
-      const existingUsername = await usersCollection.findOne({ 
-        username: { $regex: new RegExp(`^${username}$`, 'i') } 
-      });
-      
-      if (existingUsername) {
-          return res.render("signup", { 
-            error: "Username already exists. Please choose a different username." 
-          });
-      }
-
-      // Check if email already exists
-      const existingEmail = await usersCollection.findOne({ email: email });
-      
-      if (existingEmail) {
-          return res.render("signup", { 
-            error: "Email address already registered. Please use a different email." 
-          });
-      }
-
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-      // Insert the user data into the database
-      const result = await usersCollection.insertOne({
-          email: email,
-          username: username,
-          password: hashedPassword,
-          profilePic: "https://news.tulane.edu/sites/default/files/headshot_icon_0.jpg",
-          description: "",
-          dlsuID: "",
-          dlsuRole:  "member",
-          gender: "",
-          securityQuestion: securityQuestion || "What is your favorite color?",
-          securityAnswer: securityAnswer || "",
-          failedLoginAttempts: 0,
-          passwordHistory: []  // Initialize empty password history
-      });
-
-      // If insertion is successful, respond with a success message
-      if (result.insertedId) {
-          return res.redirect('/login');
-      } else {
-          return res.render("signup", { 
-            error: "Failed to create account. Please try again." 
-          });
-      }
-  } catch (error) {
-      console.error("Error occurred during signup:", error);
-      return res.render("signup", { 
-        error: "All fields are required." 
-      });
+    // Make sure all required fields are provided
+    if (!email || !username || !password || !confirmpassword) {
+      logEvent(req, 'warn', 'Signup attempt with missing fields', null);
+      return res.render("signup", { error: "All fields are required." });
     }
 
+    // Check if passwords match
     if (password !== confirmpassword) {
       logEvent(req, 'warn', 'Signup attempt with mismatched passwords', null);
       return res.render("signup", { error: "Passwords do not match." });
     }
 
+    // Validate password strength
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.isValid) {
       logEvent(req, 'warn', 'Signup attempt with weak password', null);
@@ -1021,23 +950,26 @@ app.post('/signup', async (req, res) => {
 
     const usersCollection = client.db("ForumsDB").collection("Users");
 
+    // Check if username already exists (case-insensitive)
     const existingUsername = await usersCollection.findOne({
       username: { $regex: new RegExp(`^${username}$`, 'i') }
     });
-
     if (existingUsername) {
       logEvent(req, 'warn', `Signup attempt with existing username: ${username}`, null);
       return res.render("signup", { error: "Username already exists. Please choose a different username." });
     }
 
+    // Check if email already exists
     const existingEmail = await usersCollection.findOne({ email: email });
     if (existingEmail) {
       logEvent(req, 'warn', `Signup attempt with existing email: ${email}`, null);
       return res.render("signup", { error: "Email address already registered. Please use a different email." });
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
+    // Insert the user data into the database
     const result = await usersCollection.insertOne({
       email: email,
       username: username,
@@ -1049,7 +981,8 @@ app.post('/signup', async (req, res) => {
       gender: "",
       securityQuestion: securityQuestion || "What is your favorite color?",
       securityAnswer: securityAnswer || "",
-      failedLoginAttempts: 0
+      failedLoginAttempts: 0,
+      passwordHistory: []
     });
 
     if (result.insertedId) {
@@ -1059,6 +992,7 @@ app.post('/signup', async (req, res) => {
       logEvent(req, 'error', 'User registration failed in database');
       return res.render("signup", { error: "Failed to create account. Please try again." });
     }
+
   } catch (error) {
     logEvent(req, 'error', `Signup error: ${error.message}`);
     console.error("Error occurred during signup:", error);
