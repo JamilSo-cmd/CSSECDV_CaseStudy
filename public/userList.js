@@ -1,36 +1,39 @@
 $(document).ready(function () {
-    
-    // Fetch user list from server
     $.get("/userListData", function (users) {
-
-        // Create table and header
         let table = `
             <table class="userTable">
-                <tr>
-                    <th>Username</th>
-                    <th>Gender</th>
-                    <th>ID</th>
-                    <th>Role</th>
-                </tr>
+                <thead style="position: sticky; top: 0; background-color: #f2f2f2; z-index: 1;">
+                    <tr>
+                        <th class="tableRow">Username</th>
+                        <th class="tableRow">Gender</th>
+                        <th class="tableRow">ID</th>
+                        <th class="tableRow">Role</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
 
-        // Add rows from user list
         users.forEach(user => {
             table += `
                 <tr>
-                    <td>${user.username}</td>
-                    <td>${user.gender}</td>
-                    <td>${user.dlsuID}</td>
-                    <td>${user.role}</td>
+                    <td class="tableRow">${user.username}</td>
+                    <td class="tableRow">${user.gender}</td>
+                    <td class="tableRow">${user.dlsuID}</td>
+                    <td class="tableRow">${user.dlsuRole}</td>
                 </tr>
             `;
         });
 
-        table += `</table>`;
+        table += `
+                </tbody>
+            </table>
+        `;
 
-        // Insert the table into the body
-        $(".postBody").html(table);
-
+        $(".postBody").html(table).css({
+            width: "100%",
+            height: "600px",
+            overflowY: "auto",
+            boxSizing: "border-box"
+        });
     });
-
 });
