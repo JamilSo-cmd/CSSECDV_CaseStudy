@@ -69,12 +69,41 @@
                                 <% if (typeof logs !== 'undefined' && logs.length > 0) { %>
                                     <% logs.forEach(function(log) { %>
                                         <div class="log-entry" style="padding: 8px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 0.9em;">
-                                            <span style="color: #666; margin-right: 10px;"><%= log.timestamp %></span>
+                                            <% 
+                                                // Pretty Singapore time formatting
+                                                let displayTime = "N/A";
+                                                if (log.localTime) {
+                                                    const dateObj = new Date(log.localTime);
+                                                    const opts = { 
+                                                        year: "numeric",
+                                                        month: "short",
+                                                        day: "2-digit",
+                                                        hour: "numeric",
+                                                        minute: "2-digit",
+                                                        hour12: true,
+                                                        timeZone: "Asia/Singapore"
+                                                    };
+                                                    displayTime = dateObj.toLocaleString("en-US", opts) + " SGT";
+                                                }
+                                            %>
+
+                                            <!-- Pretty SG Time -->
+                                            <span style="color: #666; margin-right: 10px;">
+                                                <%= displayTime %>
+                                            </span>
+
+                                            <!-- Log level -->
                                             <span class="log-level-<%= log.level %>">[<%= log.level.toUpperCase() %>]</span>
+
+                                            <!-- Message -->
                                             <span><%= log.message %></span>
+
+                                            <!-- Optional user -->
                                             <% if (log.userId) { %>
                                                 <span style="color: #666;"> - User: <%= log.userId %></span>
                                             <% } %>
+
+                                            <!-- Optional IP -->
                                             <% if (log.ip) { %>
                                                 <span style="color: #666;"> - IP: <%= log.ip %></span>
                                             <% } %>

@@ -1078,61 +1078,63 @@ app.get("/userListData", async (req, res) => {
 
 // Logs route - Admin only
 app.get('/logs', async (req, res) => {
-  if (!req.session.userInfo) {
-    logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
-    return res.redirect('/login');
-  }
+    if (!req.session.userInfo) {
+        logEvent(req, 'warn', 'Unauthorized logs access attempt - not logged in');
+        return res.redirect('/login');
+    }
 
-  if (req.session.userInfo.dlsuRole !== 'admin') {
-    logEvent(req, 'warn', `Non-admin user attempted to access logs: ${req.session.userInfo.username}`, req.session.userInfo._id.toString());
-    return res.status(403).render('error', {
-      message: 'Access Denied',
-      error: 'You must be an administrator to view system logs.'
-    });
-  }
+    if (req.session.userInfo.dlsuRole !== 'admin') {
+        logEvent(req, 'warn', `Non-admin user attempted to access logs: ${req.session.userInfo.username}`, req.session.userInfo._id.toString());
+        return res.status(403).render('error', {
+            message: 'Access Denied',
+            error: 'You must be an administrator to view system logs.'
+        });
+    }
 
-  try {
-    const logsCollection = client.db("ForumsDB").collection("Logs");
+    try {
+        const logsCollection = client.db("ForumsDB").collection("Logs");
 
-    const page = parseInt(req.query.page) || 1;
-    const level = req.query.level || 'all';
-    const date = req.query.date || '';
-    const search = req.query.search || '';
-    const limit = 20;
+        const page = parseInt(req.query.page) || 1;
+        const level = req.query.level || 'all';
+        const date = req.query.date || '';
+        const search = req.query.search || '';
+        const limit = 20;
 
-    let filter = {};
+        let filter = {};
 
-    if (level !== 'all') filter.level = level;
-    if (date) filter.timestamp = { $gte: new Date(date) };
-    if (search) filter.message = { $regex: search, $options: 'i' };
+        if (level !== 'all') filter.level = level;
+        if (date) filter.timestamp = { $gte: new Date(date).toISOString() };
+        if (search) filter.message = { $regex: search, $options: 'i' };
 
-    const totalLogs = await logsCollection.countDocuments(filter);
-    const totalPages = Math.ceil(totalLogs / limit);
-    const skip = (page - 1) * limit;
+        const totalLogs = await logsCollection.countDocuments(filter);
+        const totalPages = Math.ceil(totalLogs / limit);
+        const skip = (page - 1) * limit;
 
-    const logs = await logsCollection.find(filter)
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
+        // FIX: ALWAYS SORT BY NEWEST FIRST USING _id: -1
+        const logs = await logsCollection.find(filter)
+            .sort({ _id: -1 })   // <--- CORRECT SORTING ORDER
+            .skip(skip)
+            .limit(limit)
+            .toArray();
 
-    logEvent(req, 'info', 'Logs page accessed by admin', req.session.userInfo._id.toString());
-    res.render('logs', {
-      logs: logs,
-      currentPage: page,
-      totalPages: totalPages
-    });
+        logEvent(req, 'info', 'Logs page accessed by admin', req.session.userInfo._id.toString());
+        res.render('logs', {
+            logs: logs,
+            currentPage: page,
+            totalPages: totalPages
+        });
 
-  } catch (error) {
-    logEvent(req, 'error', `Error fetching logs: ${error.message}`, req.session.userInfo._id?.toString());
-    res.status(500).render('logs', {
-      logs: [],
-      currentPage: 1,
-      totalPages: 1,
-      error: "Error loading logs"
-    });
-  }
+    } catch (error) {
+        logEvent(req, 'error', `Error fetching logs: ${error.message}`, req.session.userInfo?._id?.toString());
+        res.status(500).render('logs', {
+            logs: [],
+            currentPage: 1,
+            totalPages: 1,
+            error: "Error loading logs"
+        });
+    }
 });
+
 
 // global uncaught exception handlers (non-fatal to app if logger fails)
 process.on("unhandledRejection", err => {
