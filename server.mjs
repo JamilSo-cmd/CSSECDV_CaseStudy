@@ -119,9 +119,6 @@ app.get('/', (req, res) =>{
 
 });
 
-app.get('/index', (req, res) =>{
-
-  res.render("index")
 // global variable used in original file
 var curUser = null;
 
@@ -559,20 +556,12 @@ app.post('/editProfile', async (req, res) => {
 
       console.log("User profile updated successfully");
       return res.redirect('/profile');
-      
-      
     }
   } catch (error) {
     console.error("Error occurred during editing of profile info", error);
-    if (err) {
-      logEvent(req, 'error', `Error destroying session: ${err.message}`, userId);
-      return res.status(500).json({ message: "Internal server error." });
-    }
-    logEvent(req, 'info', `User logged out: ${username}`, userId);
-    curUser = null;
-    res.clearCookie('SessionCookie');
-    res.redirect('/login');
-  });
+    logEvent(req, 'error', `Error during profile edit: ${error.message}`, req.session.userInfo?._id?.toString());
+    return res.status(500).json({ message: "Internal server error." });
+  }
 });
 
 // Profile & user related routes
@@ -863,7 +852,6 @@ app.get('/create', (req, res) => {
   res.render("create");
 });
 
-    let sessionUser = req.session.userInfo;
 // POST create post
 app.post('/create', async (req, res) => {
   try {
@@ -885,24 +873,15 @@ app.post('/create', async (req, res) => {
     const postsCollection = client.db("ForumsDB").collection("Posts");
 
     const result = await postsCollection.insertOne({
-      author:sessionUser.username,
-      authorPic:sessionUser.profilePic,
-      subject:subject,
-      message:message,
-      tag:tag,
-      date:date,
-      dislikes: 0,
-      likes: 0,
-      authorID:sessionUser._id.toString(),
       author: userID.username,
-      authorPic: curUser?.profilePic || "",
+      authorPic: userID.profilePic || "",
       subject: subject,
       message: message,
       tag: tag,
       date: date,
       dislikes: 0,
       likes: 0,
-      authorID: curUser?._id?.toString(),
+      authorID: userID._id.toString(),
     });
 
     logEvent(req, 'info', `Post created: "${subject}" by ${userID.username}`, userID._id.toString());
@@ -915,8 +894,8 @@ app.post('/create', async (req, res) => {
   }
 });
 
-// POST delete
-app.post('/delete', async (req, res) => {
+// POST delete post
+app.post('/deletePost', async (req, res) => {
   try {
     const { keyMsg, keySubject } = req.body;
 
